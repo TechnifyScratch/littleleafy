@@ -8,8 +8,8 @@ import {
 } from "three";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 
-export type PatternStyle = "smooth" | "ribs" | "wavy" | "faceted";
-export type PotProfile = "classic" | "soft-bowl" | "bell" | "cylinder";
+export type PatternStyle = "smooth" | "ribs" | "wavy" | "faceted" | "rings";
+export type PotProfile = "classic" | "soft-bowl" | "bell" | "cylinder" | "square";
 
 export type PotSettings = {
   height: number;
@@ -40,6 +40,15 @@ function patternOffset(
 
   if (pattern === "wavy") {
     return detailFade * Math.sin(angle * 7 + level * 7.5) * Math.max(0.4, radius * 0.018);
+  }
+
+  if (pattern === "rings") {
+    const band =
+      Math.exp(-Math.pow((level - 0.18) / 0.035, 2)) +
+      Math.exp(-Math.pow((level - 0.78) / 0.035, 2)) +
+      Math.exp(-Math.pow((level - 0.84) / 0.03, 2));
+
+    return band * Math.max(0.7, radius * 0.032);
   }
 
   return 0;
@@ -115,6 +124,10 @@ function radiusAt(settings: PotSettings, level: number) {
     return averageRadius + (topRadius - averageRadius) * level * 0.18;
   }
 
+  if (settings.profile === "square") {
+    return baseRadius;
+  }
+
   return baseRadius;
 }
 
@@ -129,12 +142,23 @@ function ringPoint(
     settings.pattern === "faceted" ? Math.floor(segment / 6) * 6 : segment;
   const facetedAngle = (facetedSegment / SEGMENTS) * Math.PI * 2;
   const baseRadius = radiusAt(settings, level);
-  const radius =
+  let radius =
     baseRadius -
     (inner ? settings.wallThickness : 0) +
     (inner ? 0 : patternOffset(settings.pattern, angle, level, baseRadius));
 
-  const pointAngle = settings.pattern === "faceted" ? facetedAngle : angle;
+  if (settings.profile === "square") {
+    const squareAmount = 0.68;
+    const squareRadius =
+      radius / Math.max(Math.abs(Math.cos(angle)), Math.abs(Math.sin(angle)));
+
+    radius = radius + (squareRadius - radius) * squareAmount;
+  }
+
+  const pointAngle =
+    settings.pattern === "faceted" || settings.profile === "square"
+      ? facetedAngle
+      : angle;
 
   return new Vector3(
     Math.cos(pointAngle) * radius,

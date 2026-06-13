@@ -4,15 +4,19 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, Environment, Html, OrbitControls } from "@react-three/drei";
 import JSZip from "jszip";
 import {
+  CheckCircle2,
   Download,
   Flower2,
   Package,
+  Palette,
   RefreshCcw,
   RotateCcw,
+  Ruler,
+  SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
 import { Suspense, useMemo, useRef, useState } from "react";
-import type { Mesh } from "three";
+import { DoubleSide, type Mesh } from "three";
 import {
   createPotGeometry,
   exportPotToStl,
@@ -50,42 +54,80 @@ type PotTemplate = {
   id: string;
   name: string;
   description: string;
+  vibe: string;
+  color: string;
   settings: PotSettings;
 };
+
+type BuilderStep = "style" | "size" | "details";
+
+const stepLabels: Array<{
+  id: BuilderStep;
+  title: string;
+  description: string;
+  icon: typeof Palette;
+}> = [
+  {
+    id: "style",
+    title: "Style",
+    description: "Choose a starting shape.",
+    icon: Palette,
+  },
+  {
+    id: "size",
+    title: "Size",
+    description: "Dial in dimensions.",
+    icon: Ruler,
+  },
+  {
+    id: "details",
+    title: "Details",
+    description: "Drainage, texture, export.",
+    icon: SlidersHorizontal,
+  },
+];
 
 const templates: PotTemplate[] = [
   {
     id: "classic",
-    name: "Classic Planter",
-    description: "Clean taper with a sturdy rim.",
-    settings: classicSettings,
+    name: "Classic Garden",
+    description: "Tapered outdoor pot with subtle ring detail.",
+    vibe: "Inspired by patio planters",
+    color: "#65a96b",
+    settings: { ...classicSettings, pattern: "rings", rimThickness: 8 },
   },
   {
     id: "soft-bowl",
-    name: "Soft Bowl",
-    description: "Rounded, ceramic-inspired sides.",
+    name: "Ceramic Bowl",
+    description: "Rounded patio shape with a thick soft rim.",
+    vibe: "Smooth and modern",
+    color: "#c24646",
     settings: defaultSettings,
   },
   {
     id: "ripple",
-    name: "Ripple Desk Pot",
-    description: "Gentle waves for small plants.",
+    name: "Cactus Cup",
+    description: "Small tapered cup with a clean rolled lip.",
+    vibe: "Great for succulents",
+    color: "#f0a36e",
     settings: {
-      height: 88,
-      topDiameter: 84,
-      bottomDiameter: 60,
+      height: 78,
+      topDiameter: 76,
+      bottomDiameter: 54,
       wallThickness: 3,
       drainage: true,
       drainageHoles: 5,
-      rimThickness: 5,
-      pattern: "wavy",
-      profile: "bell",
+      rimThickness: 9,
+      pattern: "smooth",
+      profile: "classic",
     },
   },
   {
     id: "ribbed",
     name: "Ribbed Cachepot",
-    description: "Subtle vertical texture.",
+    description: "Tall planter with print-friendly vertical texture.",
+    vibe: "Maker-friendly texture",
+    color: "#7f8580",
     settings: {
       height: 104,
       topDiameter: 94,
@@ -100,18 +142,20 @@ const templates: PotTemplate[] = [
   },
   {
     id: "low-poly",
-    name: "Low-Poly Mini",
-    description: "Crisp facets with a compact base.",
+    name: "Square Studio",
+    description: "A faceted square planter with crisp sides.",
+    vibe: "Minimal desktop style",
+    color: "#8e8e87",
     settings: {
-      height: 76,
-      topDiameter: 78,
-      bottomDiameter: 54,
+      height: 96,
+      topDiameter: 92,
+      bottomDiameter: 64,
       wallThickness: 3,
       drainage: true,
       drainageHoles: 4,
-      rimThickness: 4,
+      rimThickness: 6,
       pattern: "faceted",
-      profile: "cylinder",
+      profile: "square",
     },
   },
 ];
@@ -121,6 +165,7 @@ const patternLabels: Array<{ value: PatternStyle; label: string }> = [
   { value: "ribs", label: "Vertical ribs" },
   { value: "wavy", label: "Wavy" },
   { value: "faceted", label: "Faceted low-poly" },
+  { value: "rings", label: "Garden rings" },
 ];
 
 const profileLabels: Array<{ value: PotProfile; label: string }> = [
@@ -128,6 +173,15 @@ const profileLabels: Array<{ value: PotProfile; label: string }> = [
   { value: "soft-bowl", label: "Soft bowl" },
   { value: "bell", label: "Bell curve" },
   { value: "cylinder", label: "Straight cylinder" },
+  { value: "square", label: "Square taper" },
+];
+
+const colorSwatches = [
+  { name: "Sage", value: "#65a96b" },
+  { name: "Clay", value: "#f0a36e" },
+  { name: "Berry", value: "#c24646" },
+  { name: "Stone", value: "#8e8e87" },
+  { name: "Cream", value: "#e8e1d2" },
 ];
 
 const tips = [
@@ -199,9 +253,11 @@ function LoadingPot() {
 function PotModel({
   settings,
   pulseKey,
+  color,
 }: {
   settings: PotSettings;
   pulseKey: number;
+  color: string;
 }) {
   const meshRef = useRef<Mesh>(null);
   const geometry = useMemo(() => createPotGeometry(settings), [settings]);
@@ -217,9 +273,13 @@ function PotModel({
     <group key={pulseKey} scale={scale} position={[0, -0.78, 0]}>
       <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
         <meshStandardMaterial
-          color="#d4efd7"
-          roughness={0.7}
+          color={color}
+          roughness={0.82}
           metalness={0.02}
+          side={DoubleSide}
+          transparent={false}
+          opacity={1}
+          depthWrite
           polygonOffset={settings.pattern === "faceted"}
         />
       </mesh>
@@ -248,6 +308,8 @@ export function LittleLeafyGenerator() {
   const [toast, setToast] = useState(false);
   const [pulseKey, setPulseKey] = useState(0);
   const [activeTemplate, setActiveTemplate] = useState("soft-bowl");
+  const [activeStep, setActiveStep] = useState<BuilderStep>("style");
+  const [previewColor, setPreviewColor] = useState(templates[1].color);
   const activeTip = tips[pulseKey % tips.length];
 
   function updateSetting<Key extends keyof PotSettings>(key: Key, value: PotSettings[Key]) {
@@ -284,6 +346,7 @@ export function LittleLeafyGenerator() {
   function applyTemplate(template: PotTemplate) {
     setSettings(template.settings);
     setActiveTemplate(template.id);
+    setPreviewColor(template.color);
     setPulseKey((key) => key + 1);
   }
 
@@ -300,9 +363,12 @@ export function LittleLeafyGenerator() {
       pattern: patterns[randomBetween(0, patterns.length - 1)],
       profile: profileLabels[randomBetween(0, profileLabels.length - 1)].value,
     });
+    setPreviewColor(colorSwatches[randomBetween(0, colorSwatches.length - 1)].value);
     setActiveTemplate("custom");
     setPulseKey((key) => key + 1);
   }
+
+  const selectedTemplate = templates.find((template) => template.id === activeTemplate);
 
   return (
     <main className="soft-grid min-h-screen overflow-hidden bg-cream text-stone-900">
@@ -315,10 +381,10 @@ export function LittleLeafyGenerator() {
                 Free • Browser-based • No login
               </div>
               <h1 className="max-w-3xl text-4xl font-black leading-tight text-stone-950 sm:text-5xl">
-                Design a custom planter.
+                Build a planter in three steps.
               </h1>
               <p className="mt-2 max-w-2xl text-base font-medium text-stone-600 sm:text-lg">
-                Customize, preview, and download a printable plant pot — no account needed.
+                Pick a style, tune the size, and download a printable STL — no account needed.
               </p>
             </div>
           </div>
@@ -331,15 +397,19 @@ export function LittleLeafyGenerator() {
           <aside className="animate-fade-up rounded-3xl border border-white/80 bg-white/88 p-4 shadow-soft backdrop-blur md:p-5 [animation-delay:120ms]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-black text-stone-950">Pot settings</h2>
-                <p className="text-sm font-medium text-stone-500">Tweak dimensions in millimeters.</p>
+                <h2 className="text-xl font-black text-stone-950">Planter builder</h2>
+                <p className="text-sm font-medium text-stone-500">
+                  Follow the steps, or jump around anytime.
+                </p>
               </div>
               <button
                 className="press-button rounded-full border border-lilac-100 bg-lilac-50 p-3 text-lilac-700 shadow-press hover:brightness-105"
                 type="button"
                 onClick={() => {
                   setSettings(defaultSettings);
+                  setPreviewColor(templates[1].color);
                   setActiveTemplate("soft-bowl");
+                  setActiveStep("style");
                 }}
                 aria-label="Reset settings"
                 title="Reset"
@@ -348,106 +418,215 @@ export function LittleLeafyGenerator() {
               </button>
             </div>
 
-            <div className="grid gap-3">
-              <div className="rounded-2xl border border-leaf-100 bg-leaf-50/70 p-3 shadow-sm">
-                <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="mb-4 grid grid-cols-3 gap-2">
+              {stepLabels.map((step, index) => {
+                const Icon = step.icon;
+                const isActive = activeStep === step.id;
+
+                return (
+                  <button
+                    key={step.id}
+                    className={`press-button rounded-2xl border p-3 text-left shadow-sm transition ${
+                      isActive
+                        ? "border-leaf-300 bg-leaf-50 text-leaf-700"
+                        : "border-stone-100 bg-white text-stone-500"
+                    }`}
+                    type="button"
+                    onClick={() => setActiveStep(step.id)}
+                  >
+                    <span className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm">
+                      {isActive ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : (
+                        <Icon className="h-4 w-4" />
+                      )}
+                    </span>
+                    <span className="block text-xs font-black uppercase tracking-[0.12em]">
+                      {index + 1}. {step.title}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="rounded-2xl border border-leaf-100 bg-leaf-50/60 p-3 shadow-sm">
+              {activeStep === "style" ? (
+                <div className="grid gap-3">
                   <div>
-                    <p className="text-sm font-black text-stone-800">Templates</p>
-                    <p className="text-xs font-semibold text-stone-500">
-                      Start with a nicer shape, then edit it.
+                    <p className="text-base font-black text-stone-900">Choose a template</p>
+                    <p className="text-sm font-semibold text-stone-500">
+                      These are editable starting points inspired by common planter shapes.
                     </p>
                   </div>
-                  {activeTemplate === "custom" ? (
-                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-lilac-700">
-                      Custom
-                    </span>
-                  ) : null}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                  {templates.map((template) => (
-                    <button
-                      key={template.id}
-                      className={`press-button rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 ${
-                        activeTemplate === template.id
-                          ? "border-leaf-300 bg-white text-leaf-700"
-                          : "border-white/80 bg-white/70 text-stone-700"
-                      }`}
-                      type="button"
-                      onClick={() => applyTemplate(template)}
-                    >
-                      <span className="block text-sm font-black">{template.name}</span>
-                      <span className="mt-1 block text-xs font-semibold text-stone-500">
-                        {template.description}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              <RangeControl label="Pot height" value={settings.height} min={50} max={160} onChange={(value) => updateSetting("height", value)} />
-              <RangeControl label="Top diameter" value={settings.topDiameter} min={55} max={140} onChange={(value) => updateSetting("topDiameter", value)} />
-              <RangeControl label="Bottom diameter" value={settings.bottomDiameter} min={35} max={115} onChange={(value) => updateSetting("bottomDiameter", value)} />
-              <RangeControl label="Wall thickness" value={settings.wallThickness} min={2} max={7} onChange={(value) => updateSetting("wallThickness", value)} />
-              <RangeControl label="Rim thickness" value={settings.rimThickness} min={2} max={12} onChange={(value) => updateSetting("rimThickness", value)} />
-
-              <div className="rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-stone-700">Drainage holes</p>
-                    <p className="text-xs font-medium text-stone-500">Keeps roots happier.</p>
+                  <div className="grid gap-2">
+                    {templates.map((template) => (
+                      <button
+                        key={template.id}
+                        className={`press-button grid grid-cols-[3rem_1fr] gap-3 rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 ${
+                          activeTemplate === template.id
+                            ? "border-leaf-300 bg-white text-leaf-700"
+                            : "border-white/80 bg-white/75 text-stone-700"
+                        }`}
+                        type="button"
+                        onClick={() => applyTemplate(template)}
+                      >
+                        <span
+                          className="h-12 w-12 rounded-2xl border-4 border-white shadow-inner"
+                          style={{ backgroundColor: template.color }}
+                        />
+                        <span>
+                          <span className="block text-sm font-black">{template.name}</span>
+                          <span className="mt-1 block text-xs font-bold text-stone-500">
+                            {template.description}
+                          </span>
+                          <span className="mt-2 inline-flex rounded-full bg-lilac-50 px-2 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-lilac-700">
+                            {template.vibe}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
                   </div>
+
+                  <div className="rounded-2xl bg-white/80 p-3">
+                    <p className="mb-2 text-sm font-black text-stone-800">Preview color</p>
+                    <div className="flex flex-wrap gap-2">
+                      {colorSwatches.map((swatch) => (
+                        <button
+                          key={swatch.value}
+                          className={`h-10 w-10 rounded-full border-4 shadow-sm transition ${
+                            previewColor === swatch.value
+                              ? "border-lilac-500 scale-105"
+                              : "border-white"
+                          }`}
+                          type="button"
+                          title={swatch.name}
+                          style={{ backgroundColor: swatch.value }}
+                          onClick={() => {
+                            setPreviewColor(swatch.value);
+                            setActiveTemplate("custom");
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
                   <button
-                    className={`h-8 w-14 rounded-full p-1 transition ${settings.drainage ? "bg-leaf-500" : "bg-stone-200"}`}
+                    className="press-button rounded-full bg-leaf-500 px-5 py-3 text-sm font-black text-white shadow-press"
                     type="button"
-                    onClick={() => updateSetting("drainage", !settings.drainage)}
-                    aria-pressed={settings.drainage}
+                    onClick={() => setActiveStep("size")}
                   >
-                    <span
-                      className={`block h-6 w-6 rounded-full bg-white shadow transition ${settings.drainage ? "translate-x-6" : "translate-x-0"}`}
-                    />
+                    Next: adjust size
                   </button>
                 </div>
-                <div className={settings.drainage ? "mt-3 opacity-100" : "mt-3 opacity-45"}>
-                  <RangeControl
-                    label="Number of holes"
-                    value={settings.drainageHoles}
-                    min={3}
-                    max={10}
-                    unit=""
-                    onChange={(value) => updateSetting("drainageHoles", value)}
-                  />
+              ) : null}
+
+              {activeStep === "size" ? (
+                <div className="grid gap-3">
+                  <div>
+                    <p className="text-base font-black text-stone-900">Set the dimensions</p>
+                    <p className="text-sm font-semibold text-stone-500">
+                      Keep walls at least 2-3mm for easier printing.
+                    </p>
+                  </div>
+                  <RangeControl label="Pot height" value={settings.height} min={50} max={160} onChange={(value) => updateSetting("height", value)} />
+                  <RangeControl label="Top diameter" value={settings.topDiameter} min={55} max={150} onChange={(value) => updateSetting("topDiameter", value)} />
+                  <RangeControl label="Bottom diameter" value={settings.bottomDiameter} min={35} max={120} onChange={(value) => updateSetting("bottomDiameter", value)} />
+                  <RangeControl label="Wall thickness" value={settings.wallThickness} min={2} max={7} onChange={(value) => updateSetting("wallThickness", value)} />
+                  <RangeControl label="Rim thickness" value={settings.rimThickness} min={2} max={14} onChange={(value) => updateSetting("rimThickness", value)} />
+                  <button
+                    className="press-button rounded-full bg-leaf-500 px-5 py-3 text-sm font-black text-white shadow-press"
+                    type="button"
+                    onClick={() => setActiveStep("details")}
+                  >
+                    Next: details and export
+                  </button>
                 </div>
+              ) : null}
+
+              {activeStep === "details" ? (
+                <div className="grid gap-3">
+                  <div>
+                    <p className="text-base font-black text-stone-900">Finish the planter</p>
+                    <p className="text-sm font-semibold text-stone-500">
+                      Choose texture, drainage, and export when it feels right.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-stone-700">Drainage holes</p>
+                        <p className="text-xs font-medium text-stone-500">Keeps roots happier.</p>
+                      </div>
+                      <button
+                        className={`h-8 w-14 rounded-full p-1 transition ${settings.drainage ? "bg-leaf-500" : "bg-stone-200"}`}
+                        type="button"
+                        onClick={() => updateSetting("drainage", !settings.drainage)}
+                        aria-pressed={settings.drainage}
+                      >
+                        <span
+                          className={`block h-6 w-6 rounded-full bg-white shadow transition ${settings.drainage ? "translate-x-6" : "translate-x-0"}`}
+                        />
+                      </button>
+                    </div>
+                    <div className={settings.drainage ? "mt-3 opacity-100" : "mt-3 opacity-45"}>
+                      <RangeControl
+                        label="Number of holes"
+                        value={settings.drainageHoles}
+                        min={3}
+                        max={10}
+                        unit=""
+                        onChange={(value) => updateSetting("drainageHoles", value)}
+                      />
+                    </div>
+                  </div>
+
+                  <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
+                    <span className="text-sm font-semibold text-stone-700">Surface style</span>
+                    <select
+                      className="mt-2 w-full rounded-full border border-lilac-100 bg-lilac-50 px-4 py-3 text-sm font-bold text-lilac-700 outline-none ring-leaf-300 transition focus:ring-4"
+                      value={settings.pattern}
+                      onChange={(event) => updateSetting("pattern", event.target.value as PatternStyle)}
+                    >
+                      {patternLabels.map((pattern) => (
+                        <option key={pattern.value} value={pattern.value}>
+                          {pattern.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
+                    <span className="text-sm font-semibold text-stone-700">Planter shape</span>
+                    <select
+                      className="mt-2 w-full rounded-full border border-leaf-100 bg-white px-4 py-3 text-sm font-bold text-leaf-700 outline-none ring-leaf-300 transition focus:ring-4"
+                      value={settings.profile}
+                      onChange={(event) => updateSetting("profile", event.target.value as PotProfile)}
+                    >
+                      {profileLabels.map((profile) => (
+                        <option key={profile.value} value={profile.value}>
+                          {profile.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-white/75 p-3 text-sm font-bold text-stone-600">
+              <div>
+                <span className="block text-xs uppercase tracking-[0.12em] text-stone-400">
+                  Style
+                </span>
+                {selectedTemplate?.name ?? "Custom"}
               </div>
-
-              <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
-                <span className="text-sm font-semibold text-stone-700">Pattern style</span>
-                <select
-                  className="mt-2 w-full rounded-full border border-lilac-100 bg-lilac-50 px-4 py-3 text-sm font-bold text-lilac-700 outline-none ring-leaf-300 transition focus:ring-4"
-                  value={settings.pattern}
-                  onChange={(event) => updateSetting("pattern", event.target.value as PatternStyle)}
-                >
-                  {patternLabels.map((pattern) => (
-                    <option key={pattern.value} value={pattern.value}>
-                      {pattern.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
-                <span className="text-sm font-semibold text-stone-700">Planter shape</span>
-                <select
-                  className="mt-2 w-full rounded-full border border-leaf-100 bg-white px-4 py-3 text-sm font-bold text-leaf-700 outline-none ring-leaf-300 transition focus:ring-4"
-                  value={settings.profile}
-                  onChange={(event) => updateSetting("profile", event.target.value as PotProfile)}
-                >
-                  {profileLabels.map((profile) => (
-                    <option key={profile.value} value={profile.value}>
-                      {profile.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div>
+                <span className="block text-xs uppercase tracking-[0.12em] text-stone-400">
+                  Size
+                </span>
+                {settings.height} x {settings.topDiameter}mm
+              </div>
             </div>
           </aside>
 
@@ -460,7 +639,7 @@ export function LittleLeafyGenerator() {
               Live preview
             </div>
             <div className="absolute right-4 top-4 z-10 rounded-full bg-lilac-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-lilac-700 shadow-sm">
-              Hollow STL
+              Printable STL
             </div>
 
             <div className="min-h-0 flex-1">
@@ -469,7 +648,7 @@ export function LittleLeafyGenerator() {
                 <ambientLight intensity={0.72} />
                 <directionalLight position={[3, 5, 4]} intensity={1.55} castShadow />
                 <Suspense fallback={<LoadingPot />}>
-                  <PotModel settings={settings} pulseKey={pulseKey} />
+                  <PotModel settings={settings} pulseKey={pulseKey} color={previewColor} />
                   <ContactShadows position={[0, -1.02, 0]} opacity={0.26} scale={5} blur={2.2} />
                   <Environment preset="city" />
                 </Suspense>
@@ -518,7 +697,9 @@ export function LittleLeafyGenerator() {
                 type="button"
                 onClick={() => {
                   setSettings(defaultSettings);
+                  setPreviewColor(templates[1].color);
                   setActiveTemplate("soft-bowl");
+                  setActiveStep("style");
                 }}
               >
                 <RotateCcw className="h-5 w-5" />
