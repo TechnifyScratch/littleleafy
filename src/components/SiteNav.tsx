@@ -13,12 +13,12 @@ const navLinks = [
 
 export function SiteNav() {
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-4">
       <a
-        className="press-button block rounded-full bg-lilac-500 px-4 py-2 text-center text-sm font-black text-white shadow-press transition hover:brightness-105"
+        className="relative left-1/2 block w-screen -translate-x-1/2 bg-lilac-600 px-4 py-2.5 text-center text-sm font-black tracking-wide text-white shadow-sm transition hover:bg-lilac-700"
         href={makerWorldUrl}
       >
-        Support Us on MakerWorld
+        Support Us on MakerWorld →
       </a>
 
       <nav className="flex flex-col gap-3 rounded-3xl border border-white/80 bg-white/88 px-4 py-3 shadow-soft backdrop-blur md:flex-row md:items-center md:justify-between">

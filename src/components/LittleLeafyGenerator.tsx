@@ -397,7 +397,7 @@ export function LittleLeafyGenerator() {
 
   return (
     <main className="soft-grid min-h-screen overflow-hidden bg-cream text-stone-900">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-5 sm:px-6 lg:px-8">
         <SiteNav />
         <header className="animate-fade-up flex flex-col gap-5 pb-5 pt-2 md:flex-row md:items-end md:justify-between">
           <div className="flex items-start gap-4 pt-4">
