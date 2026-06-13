@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas, useFrame } from "@react-three/fiber";
-import { ContactShadows, Environment, Html, OrbitControls, Text } from "@react-three/drei";
+import { ContactShadows, Environment, Html, OrbitControls } from "@react-three/drei";
 import JSZip from "jszip";
 import {
   Download,
@@ -16,28 +16,118 @@ import type { Mesh } from "three";
 import {
   createPotGeometry,
   exportPotToStl,
+  type PotProfile,
   type PatternStyle,
   type PotSettings,
   settingsReadme,
 } from "@/lib/potGeometry";
 
-const defaultSettings: PotSettings = {
-  height: 92,
-  topDiameter: 86,
-  bottomDiameter: 58,
+const classicSettings: PotSettings = {
+  height: 96,
+  topDiameter: 88,
+  bottomDiameter: 62,
   wallThickness: 3,
   drainage: true,
   drainageHoles: 6,
   rimThickness: 5,
-  pattern: "ribs",
-  label: "sprout",
+  pattern: "smooth",
+  profile: "classic",
 };
+
+const defaultSettings: PotSettings = {
+  height: 82,
+  topDiameter: 112,
+  bottomDiameter: 68,
+  wallThickness: 3,
+  drainage: true,
+  drainageHoles: 7,
+  rimThickness: 6,
+  pattern: "smooth",
+  profile: "soft-bowl",
+};
+
+type PotTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  settings: PotSettings;
+};
+
+const templates: PotTemplate[] = [
+  {
+    id: "classic",
+    name: "Classic Planter",
+    description: "Clean taper with a sturdy rim.",
+    settings: classicSettings,
+  },
+  {
+    id: "soft-bowl",
+    name: "Soft Bowl",
+    description: "Rounded, ceramic-inspired sides.",
+    settings: defaultSettings,
+  },
+  {
+    id: "ripple",
+    name: "Ripple Desk Pot",
+    description: "Gentle waves for small plants.",
+    settings: {
+      height: 88,
+      topDiameter: 84,
+      bottomDiameter: 60,
+      wallThickness: 3,
+      drainage: true,
+      drainageHoles: 5,
+      rimThickness: 5,
+      pattern: "wavy",
+      profile: "bell",
+    },
+  },
+  {
+    id: "ribbed",
+    name: "Ribbed Cachepot",
+    description: "Subtle vertical texture.",
+    settings: {
+      height: 104,
+      topDiameter: 94,
+      bottomDiameter: 72,
+      wallThickness: 3,
+      drainage: true,
+      drainageHoles: 8,
+      rimThickness: 7,
+      pattern: "ribs",
+      profile: "classic",
+    },
+  },
+  {
+    id: "low-poly",
+    name: "Low-Poly Mini",
+    description: "Crisp facets with a compact base.",
+    settings: {
+      height: 76,
+      topDiameter: 78,
+      bottomDiameter: 54,
+      wallThickness: 3,
+      drainage: true,
+      drainageHoles: 4,
+      rimThickness: 4,
+      pattern: "faceted",
+      profile: "cylinder",
+    },
+  },
+];
 
 const patternLabels: Array<{ value: PatternStyle; label: string }> = [
   { value: "smooth", label: "Smooth" },
   { value: "ribs", label: "Vertical ribs" },
   { value: "wavy", label: "Wavy" },
   { value: "faceted", label: "Faceted low-poly" },
+];
+
+const profileLabels: Array<{ value: PotProfile; label: string }> = [
+  { value: "classic", label: "Classic taper" },
+  { value: "soft-bowl", label: "Soft bowl" },
+  { value: "bell", label: "Bell curve" },
+  { value: "cylinder", label: "Straight cylinder" },
 ];
 
 const tips = [
@@ -115,7 +205,7 @@ function PotModel({
 }) {
   const meshRef = useRef<Mesh>(null);
   const geometry = useMemo(() => createPotGeometry(settings), [settings]);
-  const scale = 2.25 / Math.max(settings.height, settings.topDiameter);
+  const scale = 1.86 / Math.max(settings.height, settings.topDiameter);
 
   useFrame((_, delta) => {
     if (meshRef.current) {
@@ -124,29 +214,15 @@ function PotModel({
   });
 
   return (
-    <group key={pulseKey} scale={scale} position={[0, -0.95, 0]}>
+    <group key={pulseKey} scale={scale} position={[0, -0.78, 0]}>
       <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
         <meshStandardMaterial
-          color="#bdf0c8"
-          roughness={0.62}
+          color="#d4efd7"
+          roughness={0.7}
           metalness={0.02}
           polygonOffset={settings.pattern === "faceted"}
         />
       </mesh>
-      {settings.label.trim() ? (
-        <Text
-          position={[0, settings.height * 0.46, settings.topDiameter * 0.51]}
-          rotation={[0, 0, 0]}
-          fontSize={Math.max(5, settings.topDiameter * 0.1)}
-          color="#6331c9"
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.18}
-          outlineColor="#fffdf6"
-        >
-          {settings.label.slice(0, 14)}
-        </Text>
-      ) : null}
     </group>
   );
 }
@@ -162,11 +238,6 @@ function downloadBlob(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
-function fileSafeName(label: string) {
-  const clean = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  return clean || "little-leafy-pot";
-}
-
 function randomBetween(min: number, max: number) {
   return Math.round(min + Math.random() * (max - min));
 }
@@ -176,10 +247,12 @@ export function LittleLeafyGenerator() {
   const [exporting, setExporting] = useState<"stl" | "zip" | null>(null);
   const [toast, setToast] = useState(false);
   const [pulseKey, setPulseKey] = useState(0);
+  const [activeTemplate, setActiveTemplate] = useState("soft-bowl");
   const activeTip = tips[pulseKey % tips.length];
 
   function updateSetting<Key extends keyof PotSettings>(key: Key, value: PotSettings[Key]) {
     setSettings((current) => ({ ...current, [key]: value }));
+    setActiveTemplate("custom");
   }
 
   function showToast() {
@@ -191,7 +264,7 @@ export function LittleLeafyGenerator() {
     setExporting("stl");
     await new Promise((resolve) => window.setTimeout(resolve, 220));
     const stl = await exportPotToStl(settings);
-    downloadBlob(new Blob([stl], { type: "model/stl" }), `${fileSafeName(settings.label)}.stl`);
+    downloadBlob(new Blob([stl], { type: "model/stl" }), "little-leafy-planter.stl");
     setExporting(null);
     showToast();
   }
@@ -200,12 +273,18 @@ export function LittleLeafyGenerator() {
     setExporting("zip");
     await new Promise((resolve) => window.setTimeout(resolve, 220));
     const zip = new JSZip();
-    zip.file(`${fileSafeName(settings.label)}.stl`, await exportPotToStl(settings));
+    zip.file("little-leafy-planter.stl", await exportPotToStl(settings));
     zip.file("README.txt", settingsReadme(settings));
     const blob = await zip.generateAsync({ type: "blob" });
-    downloadBlob(blob, `${fileSafeName(settings.label)}.zip`);
+    downloadBlob(blob, "little-leafy-planter.zip");
     setExporting(null);
     showToast();
+  }
+
+  function applyTemplate(template: PotTemplate) {
+    setSettings(template.settings);
+    setActiveTemplate(template.id);
+    setPulseKey((key) => key + 1);
   }
 
   function randomize() {
@@ -219,8 +298,9 @@ export function LittleLeafyGenerator() {
       drainageHoles: randomBetween(3, 9),
       rimThickness: randomBetween(3, 9),
       pattern: patterns[randomBetween(0, patterns.length - 1)],
-      label: ["sprout", "minty", "leafy", "desk bud", "basil"][randomBetween(0, 4)],
+      profile: profileLabels[randomBetween(0, profileLabels.length - 1)].value,
     });
+    setActiveTemplate("custom");
     setPulseKey((key) => key + 1);
   }
 
@@ -235,7 +315,7 @@ export function LittleLeafyGenerator() {
                 Free • Browser-based • No login
               </div>
               <h1 className="max-w-3xl text-4xl font-black leading-tight text-stone-950 sm:text-5xl">
-                Grow your perfect pot.
+                Design a custom planter.
               </h1>
               <p className="mt-2 max-w-2xl text-base font-medium text-stone-600 sm:text-lg">
                 Customize, preview, and download a printable plant pot — no account needed.
@@ -257,7 +337,10 @@ export function LittleLeafyGenerator() {
               <button
                 className="press-button rounded-full border border-lilac-100 bg-lilac-50 p-3 text-lilac-700 shadow-press hover:brightness-105"
                 type="button"
-                onClick={() => setSettings(defaultSettings)}
+                onClick={() => {
+                  setSettings(defaultSettings);
+                  setActiveTemplate("soft-bowl");
+                }}
                 aria-label="Reset settings"
                 title="Reset"
               >
@@ -266,6 +349,41 @@ export function LittleLeafyGenerator() {
             </div>
 
             <div className="grid gap-3">
+              <div className="rounded-2xl border border-leaf-100 bg-leaf-50/70 p-3 shadow-sm">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-stone-800">Templates</p>
+                    <p className="text-xs font-semibold text-stone-500">
+                      Start with a nicer shape, then edit it.
+                    </p>
+                  </div>
+                  {activeTemplate === "custom" ? (
+                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-lilac-700">
+                      Custom
+                    </span>
+                  ) : null}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  {templates.map((template) => (
+                    <button
+                      key={template.id}
+                      className={`press-button rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 ${
+                        activeTemplate === template.id
+                          ? "border-leaf-300 bg-white text-leaf-700"
+                          : "border-white/80 bg-white/70 text-stone-700"
+                      }`}
+                      type="button"
+                      onClick={() => applyTemplate(template)}
+                    >
+                      <span className="block text-sm font-black">{template.name}</span>
+                      <span className="mt-1 block text-xs font-semibold text-stone-500">
+                        {template.description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <RangeControl label="Pot height" value={settings.height} min={50} max={160} onChange={(value) => updateSetting("height", value)} />
               <RangeControl label="Top diameter" value={settings.topDiameter} min={55} max={140} onChange={(value) => updateSetting("topDiameter", value)} />
               <RangeControl label="Bottom diameter" value={settings.bottomDiameter} min={35} max={115} onChange={(value) => updateSetting("bottomDiameter", value)} />
@@ -317,14 +435,18 @@ export function LittleLeafyGenerator() {
               </label>
 
               <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
-                <span className="text-sm font-semibold text-stone-700">Cute front label</span>
-                <input
-                  className="mt-2 w-full rounded-full border border-leaf-100 bg-white px-4 py-3 text-sm font-semibold text-stone-800 outline-none ring-leaf-300 transition placeholder:text-stone-300 focus:ring-4"
-                  value={settings.label}
-                  maxLength={18}
-                  placeholder="sprout"
-                  onChange={(event) => updateSetting("label", event.target.value)}
-                />
+                <span className="text-sm font-semibold text-stone-700">Planter shape</span>
+                <select
+                  className="mt-2 w-full rounded-full border border-leaf-100 bg-white px-4 py-3 text-sm font-bold text-leaf-700 outline-none ring-leaf-300 transition focus:ring-4"
+                  value={settings.profile}
+                  onChange={(event) => updateSetting("profile", event.target.value as PotProfile)}
+                >
+                  {profileLabels.map((profile) => (
+                    <option key={profile.value} value={profile.value}>
+                      {profile.label}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
           </aside>
@@ -394,7 +516,10 @@ export function LittleLeafyGenerator() {
               <button
                 className="press-button inline-flex items-center justify-center gap-2 rounded-full border border-lilac-200 bg-white px-5 py-4 text-sm font-black text-lilac-700 shadow-press hover:brightness-105"
                 type="button"
-                onClick={() => setSettings(defaultSettings)}
+                onClick={() => {
+                  setSettings(defaultSettings);
+                  setActiveTemplate("soft-bowl");
+                }}
               >
                 <RotateCcw className="h-5 w-5" />
                 Reset

@@ -1,7 +1,6 @@
 import {
   BufferAttribute,
   BufferGeometry,
-  Group,
   Matrix4,
   Mesh,
   MeshStandardMaterial,
@@ -10,6 +9,7 @@ import {
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 
 export type PatternStyle = "smooth" | "ribs" | "wavy" | "faceted";
+export type PotProfile = "classic" | "soft-bowl" | "bell" | "cylinder";
 
 export type PotSettings = {
   height: number;
@@ -20,7 +20,7 @@ export type PotSettings = {
   drainageHoles: number;
   rimThickness: number;
   pattern: PatternStyle;
-  label: string;
+  profile: PotProfile;
 };
 
 const SEGMENTS = 96;
@@ -32,12 +32,14 @@ function patternOffset(
   level: number,
   radius: number,
 ) {
+  const detailFade = Math.pow(Math.sin(Math.PI * level), 0.7);
+
   if (pattern === "ribs") {
-    return Math.max(0.7, radius * 0.035) * Math.pow(Math.sin(angle * 18), 8);
+    return detailFade * Math.max(0.45, radius * 0.026) * Math.pow(Math.sin(angle * 16), 8);
   }
 
   if (pattern === "wavy") {
-    return Math.sin(angle * 8 + level * 10) * Math.max(0.55, radius * 0.024);
+    return detailFade * Math.sin(angle * 7 + level * 7.5) * Math.max(0.4, radius * 0.018);
   }
 
   return 0;
@@ -96,8 +98,24 @@ function radiusAt(settings: PotSettings, level: number) {
   const bottomRadius = settings.bottomDiameter / 2;
   const topRadius = settings.topDiameter / 2;
   const eased = level * level * (3 - 2 * level);
+  const baseRadius = bottomRadius + (topRadius - bottomRadius) * eased;
 
-  return bottomRadius + (topRadius - bottomRadius) * eased;
+  if (settings.profile === "soft-bowl") {
+    const belly = Math.sin(Math.PI * level) * Math.max(1.5, settings.topDiameter * 0.035);
+    return baseRadius + belly;
+  }
+
+  if (settings.profile === "bell") {
+    const waist = Math.sin(Math.PI * level) * Math.max(1, settings.topDiameter * 0.018);
+    return baseRadius - waist;
+  }
+
+  if (settings.profile === "cylinder") {
+    const averageRadius = (bottomRadius + topRadius) / 2;
+    return averageRadius + (topRadius - averageRadius) * level * 0.18;
+  }
+
+  return baseRadius;
 }
 
 function ringPoint(
@@ -159,13 +177,13 @@ function addBottomDisc(
   normals: number[],
   settings: PotSettings,
 ) {
-  const innerRadius = Math.max(2, settings.bottomDiameter / 2 - settings.wallThickness);
+  const bottomRadius = settings.bottomDiameter / 2;
   const holeRadius = Math.max(1.6, Math.min(4.5, settings.wallThickness * 1.8));
   const radialSteps = 24;
 
   for (let radialIndex = 0; radialIndex < radialSteps; radialIndex += 1) {
-    const r1 = (innerRadius * radialIndex) / radialSteps;
-    const r2 = (innerRadius * (radialIndex + 1)) / radialSteps;
+    const r1 = (bottomRadius * radialIndex) / radialSteps;
+    const r2 = (bottomRadius * (radialIndex + 1)) / radialSteps;
 
     for (let segment = 0; segment < SEGMENTS; segment += 1) {
       const a1 = (segment / SEGMENTS) * Math.PI * 2;
@@ -248,51 +266,14 @@ export function createPotGeometry(settings: PotSettings) {
 export async function exportPotToStl(settings: PotSettings) {
   const geometry = createPotGeometry(settings);
   const material = new MeshStandardMaterial();
-  const group = new Group();
   const mesh = new Mesh(geometry, material);
 
-  group.add(mesh);
-
-  if (settings.label.trim()) {
-    const [{ FontLoader }, { TextGeometry }, helvetiker] = await Promise.all([
-      import("three/examples/jsm/loaders/FontLoader.js"),
-      import("three/examples/jsm/geometries/TextGeometry.js"),
-      import("three/examples/fonts/helvetiker_regular.typeface.json"),
-    ]);
-    const font = new FontLoader().parse(helvetiker);
-    const textGeometry = new TextGeometry(settings.label.trim().slice(0, 14), {
-      font,
-      size: Math.max(5, settings.topDiameter * 0.1),
-      depth: Math.max(0.8, settings.wallThickness * 0.38),
-      curveSegments: 5,
-      bevelEnabled: true,
-      bevelSize: 0.18,
-      bevelThickness: 0.18,
-      bevelSegments: 1,
-    });
-    textGeometry.computeBoundingBox();
-
-    const bounds = textGeometry.boundingBox;
-    const width = bounds ? bounds.max.x - bounds.min.x : 0;
-    const height = bounds ? bounds.max.y - bounds.min.y : 0;
-    const labelRadius = radiusAt(settings, 0.48) + settings.wallThickness * 0.65;
-    const textMesh = new Mesh(textGeometry, material);
-
-    textMesh.position.set(-width / 2, settings.height * 0.46 - height / 2, labelRadius);
-    group.add(textMesh);
-  }
-
-  group.applyMatrix4(new Matrix4().makeRotationX(-Math.PI / 2));
-  group.updateMatrixWorld(true);
+  mesh.applyMatrix4(new Matrix4().makeRotationX(-Math.PI / 2));
+  mesh.updateMatrixWorld(true);
 
   const exporter = new STLExporter();
-  const stl = exporter.parse(group, { binary: false }) as string;
+  const stl = exporter.parse(mesh, { binary: false }) as string;
   geometry.dispose();
-  group.traverse((object) => {
-    if (object instanceof Mesh && object.geometry !== geometry) {
-      object.geometry.dispose();
-    }
-  });
   material.dispose();
 
   return stl;
@@ -309,7 +290,7 @@ Selected settings
 - Drainage holes: ${settings.drainage ? `${settings.drainageHoles} plus center hole` : "off"}
 - Rim thickness: ${settings.rimThickness} mm
 - Pattern style: ${settings.pattern}
-- Front label: ${settings.label || "none"}
+- Profile: ${settings.profile}
 
 Printing tips
 - Print upside down for best results.

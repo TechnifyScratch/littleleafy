@@ -8,7 +8,7 @@ Customize a pot, preview it in 3D, and download a printable STL or a ZIP bundle 
 
 - Live 3D pot preview with mouse controls
 - Custom height, diameters, wall thickness, rim, drainage, and pattern style
-- Optional raised text label on the pot
+- Editable planter templates for nicer starting shapes
 - Client-side STL export
 - ZIP export with `README.txt`
 - Mobile-friendly Next.js + Tailwind UI
