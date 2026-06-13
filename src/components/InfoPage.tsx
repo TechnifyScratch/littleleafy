@@ -9,7 +9,7 @@ type InfoPageProps = {
 
 export function InfoPage({ title, eyebrow, children }: InfoPageProps) {
   return (
-    <main className="soft-grid min-h-screen bg-cream px-4 pb-5 text-stone-900 sm:px-6 lg:px-8">
+    <main className="soft-grid min-h-screen bg-cream px-4 py-5 text-stone-900 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <SiteNav />
         <section className="mt-8 rounded-3xl border border-white/80 bg-white/90 p-6 shadow-soft backdrop-blur md:p-10">

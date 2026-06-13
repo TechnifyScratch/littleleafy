@@ -4,8 +4,10 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, Environment, Html, OrbitControls } from "@react-three/drei";
 import JSZip from "jszip";
 import {
+  CalendarDays,
   CheckCircle2,
   Download,
+  Droplets,
   Package,
   Palette,
   RefreshCcw,
@@ -13,6 +15,7 @@ import {
   Ruler,
   SlidersHorizontal,
   Sparkles,
+  Tags,
 } from "lucide-react";
 import { Suspense, useMemo, useRef, useState } from "react";
 import { DoubleSide, type Mesh } from "three";
@@ -63,6 +66,8 @@ type PotTemplate = {
 };
 
 type BuilderStep = "style" | "size" | "details";
+type GardenTool = "labels" | "spacing" | "soil";
+type SoilUse = "indoor" | "succulent" | "outdoor";
 
 const stepLabels: Array<{
   id: BuilderStep;
@@ -224,6 +229,69 @@ const tips = [
   "Try a pale filament for a ceramic look.",
 ];
 
+const gardenTools: Array<{
+  id: GardenTool;
+  name: string;
+  description: string;
+  icon: typeof Tags;
+}> = [
+  {
+    id: "labels",
+    name: "Plant labels",
+    description: "Make cute printable tags for seedlings and pots.",
+    icon: Tags,
+  },
+  {
+    id: "spacing",
+    name: "Spacing planner",
+    description: "Estimate how many plants fit in a bed or tray.",
+    icon: CalendarDays,
+  },
+  {
+    id: "soil",
+    name: "Soil mix helper",
+    description: "Create simple mix recipes by plant type.",
+    icon: Droplets,
+  },
+];
+
+const soilRecipes: Record<
+  SoilUse,
+  {
+    label: string;
+    note: string;
+    parts: Array<{ name: string; ratio: number }>;
+  }
+> = {
+  indoor: {
+    label: "Indoor leafy plants",
+    note: "Balanced moisture with enough air for happy roots.",
+    parts: [
+      { name: "Potting soil", ratio: 50 },
+      { name: "Perlite", ratio: 25 },
+      { name: "Coco coir", ratio: 25 },
+    ],
+  },
+  succulent: {
+    label: "Succulents + cactus",
+    note: "Fast-draining and chunky so roots do not sit wet.",
+    parts: [
+      { name: "Cactus soil", ratio: 45 },
+      { name: "Pumice or perlite", ratio: 35 },
+      { name: "Coarse sand", ratio: 20 },
+    ],
+  },
+  outdoor: {
+    label: "Outdoor containers",
+    note: "A sturdy all-rounder for patio herbs and flowers.",
+    parts: [
+      { name: "Compost", ratio: 35 },
+      { name: "Potting soil", ratio: 45 },
+      { name: "Perlite", ratio: 20 },
+    ],
+  },
+};
+
 function RangeControl({
   label,
   value,
@@ -326,6 +394,234 @@ function randomBetween(min: number, max: number) {
   return Math.round(min + Math.random() * (max - min));
 }
 
+function downloadPlantLabel(label: string) {
+  const safeLabel = label.trim() || "Basil";
+  const escapedLabel = safeLabel
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="520" height="180" viewBox="0 0 520 180">
+  <rect x="22" y="22" width="476" height="118" rx="44" fill="#f2fbf3" stroke="#25843e" stroke-width="8"/>
+  <path d="M260 140 L238 172 H282 Z" fill="#25843e"/>
+  <circle cx="84" cy="80" r="26" fill="#dbf5de"/>
+  <path d="M84 96 C78 76 80 60 96 48 C104 68 100 88 84 96 Z" fill="#42bd61"/>
+  <text x="130" y="92" font-family="Arial, sans-serif" font-size="44" font-weight="800" fill="#253226">${escapedLabel}</text>
+</svg>`;
+
+  downloadBlob(new Blob([svg], { type: "image/svg+xml" }), `${safeLabel.toLowerCase().replaceAll(" ", "-")}-plant-label.svg`);
+}
+
+function GardenTools() {
+  const [activeTool, setActiveTool] = useState<GardenTool>("labels");
+  const [labelText, setLabelText] = useState("Basil");
+  const [bedLength, setBedLength] = useState(120);
+  const [bedWidth, setBedWidth] = useState(60);
+  const [plantSpacing, setPlantSpacing] = useState(20);
+  const [soilUse, setSoilUse] = useState<SoilUse>("indoor");
+  const [soilVolume, setSoilVolume] = useState(8);
+
+  const spacingPlan = useMemo(() => {
+    const columns = Math.max(1, Math.floor(bedLength / plantSpacing));
+    const rows = Math.max(1, Math.floor(bedWidth / plantSpacing));
+
+    return {
+      columns,
+      rows,
+      total: columns * rows,
+      marginX: Math.max(0, Math.round((bedLength - columns * plantSpacing) / 2)),
+      marginY: Math.max(0, Math.round((bedWidth - rows * plantSpacing) / 2)),
+    };
+  }, [bedLength, bedWidth, plantSpacing]);
+
+  const activeRecipe = soilRecipes[soilUse];
+
+  return (
+    <section
+      id="garden-tools"
+      className="animate-fade-up mt-5 rounded-3xl border border-white/80 bg-white/88 p-4 shadow-soft backdrop-blur md:p-5 [animation-delay:280ms]"
+    >
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.16em] text-leaf-700">
+            Garden tools
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-stone-950">
+            Handy helpers for the rest of the garden.
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm font-semibold text-stone-500">
+            Quick little creators for labels, spacing, and soil planning — still no accounts or backend.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid gap-2">
+          {gardenTools.map((tool) => {
+            const Icon = tool.icon;
+            const isActive = activeTool === tool.id;
+
+            return (
+              <button
+                key={tool.id}
+                className={`press-button rounded-2xl border p-4 text-left shadow-sm transition ${
+                  isActive
+                    ? "border-leaf-300 bg-leaf-50 text-leaf-700"
+                    : "border-stone-100 bg-white text-stone-700"
+                }`}
+                type="button"
+                onClick={() => setActiveTool(tool.id)}
+              >
+                <span className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-black">{tool.name}</span>
+                    <span className="mt-1 block text-xs font-semibold text-stone-500">
+                      {tool.description}
+                    </span>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="rounded-3xl border border-leaf-100 bg-leaf-50/60 p-4">
+          {activeTool === "labels" ? (
+            <div className="grid gap-4 md:grid-cols-[1fr_1fr] md:items-center">
+              <div className="grid gap-3">
+                <div>
+                  <h3 className="text-xl font-black text-stone-950">Create a plant label</h3>
+                  <p className="text-sm font-semibold text-stone-500">
+                    Download an SVG tag you can print, cut, or import into design software.
+                  </p>
+                </div>
+                <label className="block rounded-2xl bg-white/85 p-3 shadow-sm">
+                  <span className="text-sm font-black text-stone-700">Plant name</span>
+                  <input
+                    className="mt-2 w-full rounded-full border border-leaf-100 bg-white px-4 py-3 text-sm font-bold text-stone-800 outline-none ring-leaf-300 transition focus:ring-4"
+                    maxLength={24}
+                    value={labelText}
+                    onChange={(event) => setLabelText(event.target.value)}
+                    placeholder="Basil, Mint, Monstera..."
+                  />
+                </label>
+                <button
+                  className="press-button rounded-full bg-leaf-500 px-5 py-3 text-sm font-black text-white shadow-press"
+                  type="button"
+                  onClick={() => downloadPlantLabel(labelText)}
+                >
+                  Download label SVG
+                </button>
+              </div>
+              <div className="rounded-3xl bg-white p-5 shadow-sm">
+                <div className="rounded-[2rem] border-4 border-leaf-700 bg-leaf-50 px-6 py-5 text-center shadow-inner">
+                  <span className="mb-2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-leaf-100 text-2xl">
+                    🌿
+                  </span>
+                  <p className="truncate text-3xl font-black text-stone-900">
+                    {labelText || "Basil"}
+                  </p>
+                </div>
+                <div className="mx-auto h-10 w-8 bg-leaf-700 [clip-path:polygon(50%_100%,0_0,100%_0)]" />
+              </div>
+            </div>
+          ) : null}
+
+          {activeTool === "spacing" ? (
+            <div className="grid gap-4 md:grid-cols-[1fr_0.9fr]">
+              <div className="grid gap-3">
+                <div>
+                  <h3 className="text-xl font-black text-stone-950">Plan a bed or tray</h3>
+                  <p className="text-sm font-semibold text-stone-500">
+                    Use centimeters for rough spacing before you plant.
+                  </p>
+                </div>
+                <RangeControl label="Bed length" value={bedLength} min={40} max={300} unit="cm" onChange={setBedLength} />
+                <RangeControl label="Bed width" value={bedWidth} min={30} max={180} unit="cm" onChange={setBedWidth} />
+                <RangeControl label="Plant spacing" value={plantSpacing} min={8} max={60} unit="cm" onChange={setPlantSpacing} />
+              </div>
+              <div className="rounded-3xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-black uppercase tracking-[0.14em] text-leaf-700">
+                  Suggested layout
+                </p>
+                <p className="mt-3 text-5xl font-black text-stone-950">
+                  {spacingPlan.total}
+                </p>
+                <p className="mt-1 text-sm font-bold text-stone-500">
+                  plants in a {spacingPlan.columns} × {spacingPlan.rows} grid
+                </p>
+                <div className="mt-5 grid grid-cols-2 gap-3 text-sm font-bold text-stone-600">
+                  <div className="rounded-2xl bg-leaf-50 p-3">
+                    Side margin
+                    <span className="block text-lg font-black text-leaf-700">
+                      {spacingPlan.marginX}cm
+                    </span>
+                  </div>
+                  <div className="rounded-2xl bg-lilac-50 p-3">
+                    End margin
+                    <span className="block text-lg font-black text-lilac-700">
+                      {spacingPlan.marginY}cm
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeTool === "soil" ? (
+            <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+              <div className="grid gap-3">
+                <div>
+                  <h3 className="text-xl font-black text-stone-950">Mix a simple soil recipe</h3>
+                  <p className="text-sm font-semibold text-stone-500">
+                    Pick a use case and scale the batch size.
+                  </p>
+                </div>
+                <label className="block rounded-2xl bg-white/85 p-3 shadow-sm">
+                  <span className="text-sm font-black text-stone-700">Plant type</span>
+                  <select
+                    className="mt-2 w-full rounded-full border border-leaf-100 bg-white px-4 py-3 text-sm font-bold text-leaf-700 outline-none ring-leaf-300 transition focus:ring-4"
+                    value={soilUse}
+                    onChange={(event) => setSoilUse(event.target.value as SoilUse)}
+                  >
+                    {Object.entries(soilRecipes).map(([key, recipe]) => (
+                      <option key={key} value={key}>
+                        {recipe.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <RangeControl label="Total mix" value={soilVolume} min={2} max={40} unit="L" onChange={setSoilVolume} />
+              </div>
+              <div className="rounded-3xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-black uppercase tracking-[0.14em] text-leaf-700">
+                  {activeRecipe.label}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-stone-500">{activeRecipe.note}</p>
+                <div className="mt-4 grid gap-2">
+                  {activeRecipe.parts.map((part) => (
+                    <div
+                      key={part.name}
+                      className="flex items-center justify-between rounded-2xl bg-leaf-50 px-4 py-3 text-sm font-bold text-stone-700"
+                    >
+                      <span>{part.name}</span>
+                      <span className="text-leaf-700">
+                        {((soilVolume * part.ratio) / 100).toFixed(1)}L
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function LittleLeafyGenerator() {
   const [settings, setSettings] = useState<PotSettings>(defaultSettings);
   const [exporting, setExporting] = useState<"stl" | "zip" | null>(null);
@@ -397,7 +693,7 @@ export function LittleLeafyGenerator() {
 
   return (
     <main className="soft-grid min-h-screen overflow-hidden bg-cream text-stone-900">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
         <SiteNav />
         <header className="animate-fade-up flex flex-col gap-5 pb-5 pt-2 md:flex-row md:items-end md:justify-between">
           <div className="flex items-start gap-4 pt-4">
@@ -749,6 +1045,8 @@ export function LittleLeafyGenerator() {
             </div>
           </section>
         </section>
+
+        <GardenTools />
 
         <footer className="py-5 text-center text-sm font-semibold text-stone-500">
           Made for plant people, makers, and tiny desk gardens.
