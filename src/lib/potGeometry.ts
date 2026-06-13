@@ -10,6 +10,7 @@ import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 
 export type PatternStyle = "smooth" | "ribs" | "wavy" | "faceted" | "rings";
 export type PotProfile = "classic" | "soft-bowl" | "bell" | "cylinder" | "square";
+export type DrainageStyle = "center-plus" | "radial" | "mesh" | "slots";
 
 export type PotSettings = {
   height: number;
@@ -18,6 +19,7 @@ export type PotSettings = {
   wallThickness: number;
   drainage: boolean;
   drainageHoles: number;
+  drainageStyle: DrainageStyle;
   rimThickness: number;
   pattern: PatternStyle;
   profile: PotProfile;
@@ -183,18 +185,60 @@ function isInsideDrainageHole(
     return false;
   }
 
-  if (Math.hypot(x, z) < holeRadius * 0.82) {
+  const distanceFromCenter = Math.hypot(x, z);
+
+  if (settings.drainageStyle === "mesh") {
+    const spacing = Math.max(holeRadius * 2.35, settings.bottomDiameter * 0.12);
+    const columns = [-2, -1, 0, 1, 2];
+
+    return columns.some((column) =>
+      columns.some((row) => {
+        const holeX = column * spacing;
+        const holeZ = row * spacing;
+        const active = Math.hypot(holeX, holeZ) < settings.bottomDiameter * 0.36;
+
+        return active && Math.hypot(x - holeX, z - holeZ) < holeRadius * 0.54;
+      }),
+    );
+  }
+
+  if (settings.drainageStyle === "slots") {
+    const slotCount = Math.max(3, Math.min(8, settings.drainageHoles));
+    const slotRadius = Math.max(settings.bottomDiameter * 0.18, holeRadius * 2.2);
+    const slotLength = Math.max(settings.bottomDiameter * 0.16, holeRadius * 3);
+    const slotWidth = Math.max(1.5, holeRadius * 0.62);
+
+    for (let index = 0; index < slotCount; index += 1) {
+      const angle = (index / slotCount) * Math.PI * 2;
+      const tangentX = -Math.sin(angle);
+      const tangentZ = Math.cos(angle);
+      const centerX = Math.cos(angle) * slotRadius;
+      const centerZ = Math.sin(angle) * slotRadius;
+      const localX = (x - centerX) * tangentX + (z - centerZ) * tangentZ;
+      const localZ = -(x - centerX) * tangentZ + (z - centerZ) * tangentX;
+
+      if (Math.abs(localX) < slotLength / 2 && Math.abs(localZ) < slotWidth) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  if (settings.drainageStyle === "center-plus" && distanceFromCenter < holeRadius * 0.9) {
     return true;
   }
 
   const ringRadius = Math.max(settings.bottomDiameter * 0.16, holeRadius * 2.2);
+  const ringHoleRadius =
+    settings.drainageStyle === "center-plus" ? holeRadius * 0.78 : holeRadius;
 
   for (let index = 0; index < settings.drainageHoles; index += 1) {
     const angle = (index / settings.drainageHoles) * Math.PI * 2;
     const holeX = Math.cos(angle) * ringRadius;
     const holeZ = Math.sin(angle) * ringRadius;
 
-    if (Math.hypot(x - holeX, z - holeZ) < holeRadius) {
+    if (Math.hypot(x - holeX, z - holeZ) < ringHoleRadius) {
       return true;
     }
   }
@@ -317,7 +361,8 @@ Selected settings
 - Top diameter: ${settings.topDiameter} mm
 - Bottom diameter: ${settings.bottomDiameter} mm
 - Wall thickness: ${settings.wallThickness} mm
-- Drainage holes: ${settings.drainage ? `${settings.drainageHoles} plus center hole` : "off"}
+- Drainage holes: ${settings.drainage ? settings.drainageHoles : "off"}
+- Drainage style: ${settings.drainage ? settings.drainageStyle : "off"}
 - Rim thickness: ${settings.rimThickness} mm
 - Pattern style: ${settings.pattern}
 - Profile: ${settings.profile}

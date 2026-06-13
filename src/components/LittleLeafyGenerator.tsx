@@ -6,7 +6,6 @@ import JSZip from "jszip";
 import {
   CheckCircle2,
   Download,
-  Flower2,
   Package,
   Palette,
   RefreshCcw,
@@ -20,11 +19,13 @@ import { DoubleSide, type Mesh } from "three";
 import {
   createPotGeometry,
   exportPotToStl,
+  type DrainageStyle,
   type PotProfile,
   type PatternStyle,
   type PotSettings,
   settingsReadme,
 } from "@/lib/potGeometry";
+import { SiteNav } from "@/components/SiteNav";
 
 const classicSettings: PotSettings = {
   height: 96,
@@ -33,6 +34,7 @@ const classicSettings: PotSettings = {
   wallThickness: 3,
   drainage: true,
   drainageHoles: 6,
+  drainageStyle: "radial",
   rimThickness: 5,
   pattern: "smooth",
   profile: "classic",
@@ -45,6 +47,7 @@ const defaultSettings: PotSettings = {
   wallThickness: 3,
   drainage: true,
   drainageHoles: 7,
+  drainageStyle: "mesh",
   rimThickness: 6,
   pattern: "smooth",
   profile: "soft-bowl",
@@ -117,6 +120,7 @@ const templates: PotTemplate[] = [
       wallThickness: 3,
       drainage: true,
       drainageHoles: 5,
+      drainageStyle: "center-plus",
       rimThickness: 9,
       pattern: "smooth",
       profile: "classic",
@@ -135,6 +139,7 @@ const templates: PotTemplate[] = [
       wallThickness: 3,
       drainage: true,
       drainageHoles: 8,
+      drainageStyle: "radial",
       rimThickness: 7,
       pattern: "ribs",
       profile: "classic",
@@ -153,6 +158,7 @@ const templates: PotTemplate[] = [
       wallThickness: 3,
       drainage: true,
       drainageHoles: 4,
+      drainageStyle: "slots",
       rimThickness: 6,
       pattern: "faceted",
       profile: "square",
@@ -176,6 +182,33 @@ const profileLabels: Array<{ value: PotProfile; label: string }> = [
   { value: "square", label: "Square taper" },
 ];
 
+const drainageOptions: Array<{
+  value: DrainageStyle;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "center-plus",
+    label: "Center plus",
+    description: "One center hole plus a small outer ring.",
+  },
+  {
+    value: "radial",
+    label: "Radial ring",
+    description: "Evenly spaced holes for general planters.",
+  },
+  {
+    value: "mesh",
+    label: "Micro mesh",
+    description: "Many small holes for finer soil mixes.",
+  },
+  {
+    value: "slots",
+    label: "Long slots",
+    description: "Wider drainage for chunky soil and outdoor pots.",
+  },
+];
+
 const colorSwatches = [
   { name: "Sage", value: "#65a96b" },
   { name: "Clay", value: "#f0a36e" },
@@ -190,15 +223,6 @@ const tips = [
   "Add drainage mesh before soil.",
   "Try a pale filament for a ceramic look.",
 ];
-
-function LeafMascot() {
-  return (
-    <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-leaf-100 text-leaf-700 shadow-inner">
-      <Flower2 className="h-6 w-6" aria-hidden="true" />
-      <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-lilac-300" />
-    </span>
-  );
-}
 
 function RangeControl({
   label,
@@ -362,6 +386,7 @@ export function LittleLeafyGenerator() {
       rimThickness: randomBetween(3, 9),
       pattern: patterns[randomBetween(0, patterns.length - 1)],
       profile: profileLabels[randomBetween(0, profileLabels.length - 1)].value,
+      drainageStyle: drainageOptions[randomBetween(0, drainageOptions.length - 1)].value,
     });
     setPreviewColor(colorSwatches[randomBetween(0, colorSwatches.length - 1)].value);
     setActiveTemplate("custom");
@@ -373,13 +398,10 @@ export function LittleLeafyGenerator() {
   return (
     <main className="soft-grid min-h-screen overflow-hidden bg-cream text-stone-900">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
+        <SiteNav />
         <header className="animate-fade-up flex flex-col gap-5 pb-5 pt-2 md:flex-row md:items-end md:justify-between">
-          <div className="flex items-start gap-4">
-            <LeafMascot />
+          <div className="flex items-start gap-4 pt-4">
             <div>
-              <div className="mb-3 inline-flex rounded-full border border-leaf-200 bg-white/85 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-leaf-700 shadow-sm">
-                Free • Browser-based • No login
-              </div>
               <h1 className="max-w-3xl text-4xl font-black leading-tight text-stone-950 sm:text-5xl">
                 Build a planter in three steps.
               </h1>
@@ -570,6 +592,25 @@ export function LittleLeafyGenerator() {
                       </button>
                     </div>
                     <div className={settings.drainage ? "mt-3 opacity-100" : "mt-3 opacity-45"}>
+                      <div className="mb-3 grid gap-2">
+                        {drainageOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            className={`rounded-2xl border p-3 text-left transition ${
+                              settings.drainageStyle === option.value
+                                ? "border-leaf-300 bg-leaf-50 text-leaf-700"
+                                : "border-stone-100 bg-white text-stone-600"
+                            }`}
+                            type="button"
+                            onClick={() => updateSetting("drainageStyle", option.value)}
+                          >
+                            <span className="block text-sm font-black">{option.label}</span>
+                            <span className="mt-1 block text-xs font-semibold text-stone-500">
+                              {option.description}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                       <RangeControl
                         label="Number of holes"
                         value={settings.drainageHoles}
