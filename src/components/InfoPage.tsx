@@ -19,7 +19,7 @@ export function InfoPage({ title, eyebrow, children }: InfoPageProps) {
           <h1 className="mt-3 text-4xl font-black leading-tight text-stone-950 md:text-5xl">
             {title}
           </h1>
-          <div className="mt-6 grid gap-5 text-base font-medium leading-7 text-stone-600">
+          <div className="mt-6 grid gap-5 text-base font-medium leading-7 text-stone-600 [&_h2]:mt-3 [&_h2]:text-2xl [&_h2]:font-black [&_h2]:leading-tight [&_h2]:text-stone-950 [&_h3]:text-lg [&_h3]:font-black [&_h3]:text-stone-900 [&_li]:ml-5 [&_li]:list-disc [&_strong]:font-black [&_strong]:text-stone-800">
             {children}
           </div>
           <Link
