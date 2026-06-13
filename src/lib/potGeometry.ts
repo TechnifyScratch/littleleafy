@@ -142,10 +142,16 @@ function ringPoint(
     settings.pattern === "faceted" ? Math.floor(segment / 6) * 6 : segment;
   const facetedAngle = (facetedSegment / SEGMENTS) * Math.PI * 2;
   const baseRadius = radiusAt(settings, level);
+  const rimLip =
+    inner || level < 0.84
+      ? 0
+      : Math.exp(-Math.pow((level - 0.965) / 0.055, 2)) *
+        Math.max(1.2, settings.rimThickness * 0.44);
   let radius =
     baseRadius -
     (inner ? settings.wallThickness : 0) +
-    (inner ? 0 : patternOffset(settings.pattern, angle, level, baseRadius));
+    (inner ? 0 : patternOffset(settings.pattern, angle, level, baseRadius)) +
+    rimLip;
 
   if (settings.profile === "square") {
     const squareAmount = 0.68;
