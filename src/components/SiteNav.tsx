@@ -1,8 +1,13 @@
 import Link from "next/link";
-import { Flower2 } from "lucide-react";
+import { ChevronDown, Flower2 } from "lucide-react";
+
+const toolLinks = [
+  { href: "/tools/labels", label: "Plant labels" },
+  { href: "/tools/spacing", label: "Spacing planner" },
+  { href: "/tools/soil", label: "Soil mix helper" },
+];
 
 const navLinks = [
-  { href: "/#garden-tools", label: "Garden Tools" },
   { href: "/about", label: "About" },
   { href: "/changelog", label: "Changelog" },
   { href: "/privacy", label: "Privacy" },
@@ -27,7 +32,25 @@ export function SiteNav() {
           </span>
         </Link>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <details className="group relative">
+            <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full px-3 py-2 text-sm font-black text-stone-600 transition hover:bg-leaf-50 hover:text-leaf-700 [&::-webkit-details-marker]:hidden">
+              Garden Tools
+              <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+            </summary>
+            <div className="z-30 mt-2 grid w-full min-w-52 gap-1 rounded-2xl border border-leaf-100 bg-white p-2 shadow-soft md:absolute md:right-0">
+              {toolLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  className="rounded-xl px-3 py-2 text-sm font-black text-stone-600 transition hover:bg-leaf-50 hover:text-leaf-700"
+                  href={link.href}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+
           {navLinks.map((link) => (
             <Link
               key={link.href}
