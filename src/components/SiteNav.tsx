@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, Flower2 } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 const toolLinks = [
   { href: "/tools/labels", label: "Plant labels" },
@@ -20,8 +20,12 @@ export function SiteNav() {
     <div className="relative z-[100] grid gap-3">
       <nav className="relative z-[100] flex overflow-visible flex-col gap-3 rounded-3xl border border-white/80 bg-white/88 px-4 py-3 shadow-soft backdrop-blur md:flex-row md:items-center md:justify-between">
         <Link className="flex items-center gap-3" href="/">
-          <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-leaf-100 text-leaf-700 shadow-inner">
-            <Flower2 className="h-6 w-6" aria-hidden="true" />
+          <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-leaf-50 shadow-inner">
+            <img
+              alt="LittleLeafy logo"
+              className="h-12 w-12 object-contain"
+              src="/littleleafy-logo.png"
+            />
             <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-lilac-300" />
           </span>
           <span>

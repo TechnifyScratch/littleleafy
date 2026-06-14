@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: "LittleLeafy",
   description:
     "Customize, preview, and download printable plant pots from your browser.",
+  icons: {
+    icon: "/favicon.png",
+    apple: "/littleleafy-logo.png",
+  },
 };
 
 export default function RootLayout({
