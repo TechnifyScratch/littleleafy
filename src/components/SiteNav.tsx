@@ -63,6 +63,15 @@ export function SiteNav() {
               {link.label}
             </Link>
           ))}
+
+          <a
+            className="support-button rounded-full bg-lilac-500 px-4 py-2 text-sm font-black text-white shadow-press"
+            href="https://store.heyrivo.com/donate"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Support Us
+          </a>
         </div>
       </nav>
     </div>
