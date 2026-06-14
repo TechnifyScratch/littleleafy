@@ -29,9 +29,6 @@ export function SiteNav() {
           </span>
           <span>
             <span className="block text-lg font-black leading-none text-stone-950">LittleLeafy</span>
-            <span className="text-xs font-bold uppercase tracking-[0.16em] text-leaf-700">
-              Browser planter studio
-            </span>
           </span>
         </Link>
 
