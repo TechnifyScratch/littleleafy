@@ -18,6 +18,8 @@ import { Suspense, useMemo, useRef, useState } from "react";
 import { DoubleSide, type Mesh } from "three";
 import {
   createPotGeometry,
+  createSnapBaseGeometry,
+  exportPotPartsToStl,
   exportPotToStl,
   type DrainageStyle,
   type PotProfile,
@@ -38,6 +40,7 @@ const classicSettings: PotSettings = {
   rimThickness: 5,
   pattern: "smooth",
   profile: "classic",
+  twoPiece: false,
 };
 
 const defaultSettings: PotSettings = {
@@ -51,6 +54,7 @@ const defaultSettings: PotSettings = {
   rimThickness: 6,
   pattern: "smooth",
   profile: "soft-bowl",
+  twoPiece: false,
 };
 
 type PotTemplate = {
@@ -124,6 +128,7 @@ const templates: PotTemplate[] = [
       rimThickness: 9,
       pattern: "smooth",
       profile: "classic",
+      twoPiece: false,
     },
   },
   {
@@ -141,8 +146,29 @@ const templates: PotTemplate[] = [
       drainageHoles: 8,
       drainageStyle: "radial",
       rimThickness: 7,
-      pattern: "ribs",
+      pattern: "fluted",
       profile: "classic",
+      twoPiece: true,
+    },
+  },
+  {
+    id: "arched",
+    name: "Arch Relief Pot",
+    description: "Soft repeating arches inspired by ceramic texture.",
+    vibe: "Statement texture",
+    color: "#e8e1d2",
+    settings: {
+      height: 92,
+      topDiameter: 104,
+      bottomDiameter: 86,
+      wallThickness: 3,
+      drainage: true,
+      drainageHoles: 7,
+      drainageStyle: "mesh",
+      rimThickness: 6,
+      pattern: "arches",
+      profile: "cylinder",
+      twoPiece: false,
     },
   },
   {
@@ -160,16 +186,22 @@ const templates: PotTemplate[] = [
       drainageHoles: 4,
       drainageStyle: "slots",
       rimThickness: 6,
-      pattern: "faceted",
+      pattern: "geo",
       profile: "square",
+      twoPiece: false,
     },
   },
 ];
 
 const patternLabels: Array<{ value: PatternStyle; label: string }> = [
   { value: "smooth", label: "Smooth" },
-  { value: "ribs", label: "Vertical ribs" },
-  { value: "wavy", label: "Wavy" },
+  { value: "ribs", label: "Subtle vertical ribs" },
+  { value: "fluted", label: "Deep fluted ribs" },
+  { value: "spiral", label: "Spiral grooves" },
+  { value: "arches", label: "Arched ceramic relief" },
+  { value: "geo", label: "Geometric facets" },
+  { value: "wave-ridges", label: "Wavy raised ridges" },
+  { value: "wavy", label: "Soft wavy surface" },
   { value: "faceted", label: "Faceted low-poly" },
   { value: "rings", label: "Garden rings" },
 ];
@@ -284,7 +316,11 @@ function PotModel({
   color: string;
 }) {
   const meshRef = useRef<Mesh>(null);
-  const geometry = useMemo(() => createPotGeometry(settings), [settings]);
+  const potGeometry = useMemo(() => createPotGeometry(settings), [settings]);
+  const baseGeometry = useMemo(
+    () => (settings.twoPiece ? createSnapBaseGeometry(settings) : null),
+    [settings],
+  );
   const scale = 1.86 / Math.max(settings.height, settings.topDiameter);
 
   useFrame((_, delta) => {
@@ -295,7 +331,7 @@ function PotModel({
 
   return (
     <group key={pulseKey} scale={scale} position={[0, -0.78, 0]}>
-      <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
+      <mesh ref={meshRef} geometry={potGeometry} castShadow receiveShadow>
         <meshStandardMaterial
           color={color}
           roughness={0.82}
@@ -307,6 +343,16 @@ function PotModel({
           polygonOffset={settings.pattern === "faceted"}
         />
       </mesh>
+      {baseGeometry ? (
+        <mesh geometry={baseGeometry} castShadow receiveShadow>
+          <meshStandardMaterial
+            color="#b8793f"
+            roughness={0.92}
+            metalness={0}
+            side={DoubleSide}
+          />
+        </mesh>
+      ) : null}
     </group>
   );
 }
@@ -359,7 +405,15 @@ export function LittleLeafyGenerator() {
     setExporting("zip");
     await new Promise((resolve) => window.setTimeout(resolve, 220));
     const zip = new JSZip();
-    zip.file("little-leafy-planter.stl", await exportPotToStl(settings));
+    const parts = await exportPotPartsToStl(settings);
+
+    if (parts.base) {
+      zip.file("little-leafy-planter-body.stl", parts.body);
+      zip.file("little-leafy-snap-base.stl", parts.base);
+    } else {
+      zip.file("little-leafy-planter.stl", parts.body);
+    }
+
     zip.file("README.txt", settingsReadme(settings));
     const blob = await zip.generateAsync({ type: "blob" });
     downloadBlob(blob, "little-leafy-planter.zip");
@@ -387,6 +441,7 @@ export function LittleLeafyGenerator() {
       pattern: patterns[randomBetween(0, patterns.length - 1)],
       profile: profileLabels[randomBetween(0, profileLabels.length - 1)].value,
       drainageStyle: drainageOptions[randomBetween(0, drainageOptions.length - 1)].value,
+      twoPiece: Math.random() > 0.66,
     });
     setPreviewColor(colorSwatches[randomBetween(0, colorSwatches.length - 1)].value);
     setActiveTemplate("custom");
@@ -637,6 +692,32 @@ export function LittleLeafyGenerator() {
                     </select>
                   </label>
 
+                  <div className="rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-stone-700">Two-piece snap pot</p>
+                        <p className="text-xs font-medium text-stone-500">
+                          Adds a cork-textured base sleeve that clicks over a lower bead.
+                        </p>
+                      </div>
+                      <button
+                        className={`h-8 w-14 shrink-0 rounded-full p-1 transition ${settings.twoPiece ? "bg-lilac-500" : "bg-stone-200"}`}
+                        type="button"
+                        onClick={() => updateSetting("twoPiece", !settings.twoPiece)}
+                        aria-pressed={Boolean(settings.twoPiece)}
+                      >
+                        <span
+                          className={`block h-6 w-6 rounded-full bg-white shadow transition ${settings.twoPiece ? "translate-x-6" : "translate-x-0"}`}
+                        />
+                      </button>
+                    </div>
+                    {settings.twoPiece ? (
+                      <p className="mt-3 rounded-2xl bg-lilac-50 px-3 py-2 text-xs font-bold text-lilac-700">
+                        ZIP export includes separate body and snap-base STL files.
+                      </p>
+                    ) : null}
+                  </div>
+
                   <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
                     <span className="text-sm font-semibold text-stone-700">Planter shape</span>
                     <select
@@ -664,9 +745,9 @@ export function LittleLeafyGenerator() {
               </div>
               <div>
                 <span className="block text-xs uppercase tracking-[0.12em] text-stone-400">
-                  Size
+                  Build
                 </span>
-                {settings.height} x {settings.topDiameter}mm
+                {settings.twoPiece ? "Two-piece snap fit" : `${settings.height} x ${settings.topDiameter}mm`}
               </div>
             </div>
           </aside>
@@ -680,7 +761,7 @@ export function LittleLeafyGenerator() {
               Live preview
             </div>
             <div className="absolute right-4 top-4 z-10 rounded-full bg-lilac-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-lilac-700 shadow-sm">
-              Printable STL
+              {settings.twoPiece ? "Two-piece STL" : "Printable STL"}
             </div>
 
             <div className="min-h-0 flex-1">
