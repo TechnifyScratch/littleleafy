@@ -26,7 +26,6 @@ export function SiteNav() {
               className="h-12 w-12 object-contain"
               src="/littleleafy-logo.png"
             />
-            <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-lilac-300" />
           </span>
           <span>
             <span className="block text-lg font-black leading-none text-stone-950">LittleLeafy</span>
