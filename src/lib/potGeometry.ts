@@ -22,6 +22,7 @@ export type PatternStyle =
   | "rings";
 export type PotProfile = "classic" | "soft-bowl" | "bell" | "cylinder" | "square";
 export type DrainageStyle = "center-plus" | "radial" | "mesh" | "slots";
+export type BaseTextureStyle = "cork" | "smooth" | "vertical-ribs" | "soft-rings" | "faceted";
 
 export type PotSettings = {
   height: number;
@@ -35,6 +36,7 @@ export type PotSettings = {
   pattern: PatternStyle;
   profile: PotProfile;
   twoPiece?: boolean;
+  baseTexture?: BaseTextureStyle;
 };
 
 const SEGMENTS = 96;
@@ -194,6 +196,29 @@ function corkOffset(angle: number, level: number) {
     Math.sin(angle * 8 + level * 77) * 0.12;
 
   return grain * 0.8;
+}
+
+function baseTextureOffset(texture: BaseTextureStyle | undefined, angle: number, level: number) {
+  if (texture === "smooth") {
+    return 0;
+  }
+
+  if (texture === "vertical-ribs") {
+    return Math.pow(Math.max(0, Math.cos(angle * 26)), 1.8) * 1.15;
+  }
+
+  if (texture === "soft-rings") {
+    return (
+      Math.exp(-Math.pow((level - 0.22) / 0.035, 2)) +
+      Math.exp(-Math.pow((level - 0.64) / 0.045, 2))
+    ) * 0.9;
+  }
+
+  if (texture === "faceted") {
+    return Math.pow(Math.max(0, Math.cos(angle * 14)), 1.25) * 0.72;
+  }
+
+  return corkOffset(angle, level);
 }
 
 function ringPoint(
@@ -412,7 +437,7 @@ function baseRingPoint(settings: PotSettings, level: number, segment: number, in
   const potRadius = radiusAt(settings, potLevel);
   const groove =
     Math.exp(-Math.pow((potLevel - snapLevel(settings)) / 0.024, 2)) * (inner ? 1.15 : 0);
-  const outerTexture = inner ? 0 : corkOffset(angle, level);
+  const outerTexture = inner ? 0 : baseTextureOffset(settings.baseTexture, angle, level);
   const radius = inner
     ? potRadius + 0.3 - groove
     : potRadius + Math.max(3.8, settings.wallThickness * 1.3) + outerTexture;
@@ -562,6 +587,7 @@ Selected settings
 - Pattern style: ${settings.pattern}
 - Profile: ${settings.profile}
 - Two-piece snap base: ${settings.twoPiece ? "on — exports planter body plus cork-textured snap sleeve" : "off"}
+- Base texture: ${settings.twoPiece ? settings.baseTexture ?? "cork" : "not used"}
 
 Printing tips
 - Print upside down for best results.

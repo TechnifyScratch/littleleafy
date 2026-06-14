@@ -21,6 +21,7 @@ import {
   createSnapBaseGeometry,
   exportPotPartsToStl,
   exportPotToStl,
+  type BaseTextureStyle,
   type DrainageStyle,
   type PotProfile,
   type PatternStyle,
@@ -41,6 +42,7 @@ const classicSettings: PotSettings = {
   pattern: "smooth",
   profile: "classic",
   twoPiece: false,
+  baseTexture: "cork",
 };
 
 const defaultSettings: PotSettings = {
@@ -55,6 +57,7 @@ const defaultSettings: PotSettings = {
   pattern: "smooth",
   profile: "soft-bowl",
   twoPiece: false,
+  baseTexture: "cork",
 };
 
 type PotTemplate = {
@@ -66,7 +69,7 @@ type PotTemplate = {
   settings: PotSettings;
 };
 
-type BuilderStep = "style" | "size" | "details";
+type BuilderStep = "style" | "size" | "shape" | "texture" | "drainage" | "base";
 
 const stepLabels: Array<{
   id: BuilderStep;
@@ -87,9 +90,27 @@ const stepLabels: Array<{
     icon: Ruler,
   },
   {
-    id: "details",
-    title: "Details",
-    description: "Drainage, texture, export.",
+    id: "shape",
+    title: "Shape",
+    description: "Pick profile and color.",
+    icon: Palette,
+  },
+  {
+    id: "texture",
+    title: "Texture",
+    description: "Choose body relief.",
+    icon: SlidersHorizontal,
+  },
+  {
+    id: "drainage",
+    title: "Drainage",
+    description: "Tune the bottom holes.",
+    icon: SlidersHorizontal,
+  },
+  {
+    id: "base",
+    title: "Base",
+    description: "Set snap-fit options.",
     icon: SlidersHorizontal,
   },
 ];
@@ -129,6 +150,7 @@ const templates: PotTemplate[] = [
       pattern: "smooth",
       profile: "classic",
       twoPiece: false,
+      baseTexture: "cork",
     },
   },
   {
@@ -149,6 +171,7 @@ const templates: PotTemplate[] = [
       pattern: "fluted",
       profile: "classic",
       twoPiece: true,
+      baseTexture: "cork",
     },
   },
   {
@@ -169,6 +192,7 @@ const templates: PotTemplate[] = [
       pattern: "arches",
       profile: "cylinder",
       twoPiece: false,
+      baseTexture: "smooth",
     },
   },
   {
@@ -189,6 +213,7 @@ const templates: PotTemplate[] = [
       pattern: "geo",
       profile: "square",
       twoPiece: false,
+      baseTexture: "faceted",
     },
   },
 ];
@@ -238,6 +263,38 @@ const drainageOptions: Array<{
     value: "slots",
     label: "Long slots",
     description: "Wider drainage for chunky soil and outdoor pots.",
+  },
+];
+
+const baseTextureLabels: Array<{
+  value: BaseTextureStyle;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "cork",
+    label: "Subtle cork grain",
+    description: "Warm organic texture, not too intense.",
+  },
+  {
+    value: "smooth",
+    label: "Smooth modern band",
+    description: "Clean two-tone base.",
+  },
+  {
+    value: "vertical-ribs",
+    label: "Fine vertical ribs",
+    description: "Matches modern ribbed planters.",
+  },
+  {
+    value: "soft-rings",
+    label: "Soft horizontal rings",
+    description: "Gentle stacked ceramic detail.",
+  },
+  {
+    value: "faceted",
+    label: "Tiny facets",
+    description: "Low-poly grip with subtle highlights.",
   },
 ];
 
@@ -372,6 +429,23 @@ function randomBetween(min: number, max: number) {
   return Math.round(min + Math.random() * (max - min));
 }
 
+function scratchSettings(): PotSettings {
+  return {
+    height: 90,
+    topDiameter: 96,
+    bottomDiameter: 70,
+    wallThickness: 3,
+    drainage: true,
+    drainageHoles: 6,
+    drainageStyle: "radial",
+    rimThickness: 6,
+    pattern: "smooth",
+    profile: "classic",
+    twoPiece: false,
+    baseTexture: "cork",
+  };
+}
+
 export function LittleLeafyGenerator() {
   const [settings, setSettings] = useState<PotSettings>(defaultSettings);
   const [exporting, setExporting] = useState<"stl" | "zip" | null>(null);
@@ -442,6 +516,7 @@ export function LittleLeafyGenerator() {
       profile: profileLabels[randomBetween(0, profileLabels.length - 1)].value,
       drainageStyle: drainageOptions[randomBetween(0, drainageOptions.length - 1)].value,
       twoPiece: Math.random() > 0.66,
+      baseTexture: baseTextureLabels[randomBetween(0, baseTextureLabels.length - 1)].value,
     });
     setPreviewColor(colorSwatches[randomBetween(0, colorSwatches.length - 1)].value);
     setActiveTemplate("custom");
@@ -449,6 +524,14 @@ export function LittleLeafyGenerator() {
   }
 
   const selectedTemplate = templates.find((template) => template.id === activeTemplate);
+
+  function createFromScratch() {
+    setSettings(scratchSettings());
+    setPreviewColor(colorSwatches[0].value);
+    setActiveTemplate("custom");
+    setActiveStep("size");
+    setPulseKey((key) => key + 1);
+  }
 
   return (
     <main className="soft-grid min-h-screen overflow-hidden bg-cream text-stone-900">
@@ -495,7 +578,7 @@ export function LittleLeafyGenerator() {
               </button>
             </div>
 
-            <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {stepLabels.map((step, index) => {
                 const Icon = step.icon;
                 const isActive = activeStep === step.id;
@@ -518,7 +601,7 @@ export function LittleLeafyGenerator() {
                         <Icon className="h-4 w-4" />
                       )}
                     </span>
-                    <span className="block text-xs font-black uppercase tracking-[0.12em]">
+                    <span className="block text-[11px] font-black uppercase tracking-[0.12em]">
                       {index + 1}. {step.title}
                     </span>
                   </button>
@@ -532,9 +615,27 @@ export function LittleLeafyGenerator() {
                   <div>
                     <p className="text-base font-black text-stone-900">Choose a template</p>
                     <p className="text-sm font-semibold text-stone-500">
-                      These are editable starting points inspired by common planter shapes.
+                      Pick a starting point or make every choice yourself.
                     </p>
                   </div>
+
+                  <button
+                    className={`press-button rounded-2xl border p-4 text-left shadow-sm transition ${
+                      activeTemplate === "custom"
+                        ? "border-lilac-300 bg-white text-lilac-700"
+                        : "border-lilac-100 bg-lilac-50/80 text-stone-700"
+                    }`}
+                    type="button"
+                    onClick={createFromScratch}
+                  >
+                    <span className="block text-base font-black">Build your own</span>
+                    <span className="mt-1 block text-[11px] font-black uppercase tracking-[0.14em] text-lilac-700">
+                      Create from scratch
+                    </span>
+                    <span className="mt-2 block text-xs font-semibold text-stone-500">
+                      Walk through size, shape, body texture, drainage, and two-piece base details.
+                    </span>
+                  </button>
 
                   <div className="grid gap-2">
                     {templates.map((template) => (
@@ -593,7 +694,7 @@ export function LittleLeafyGenerator() {
                     type="button"
                     onClick={() => setActiveStep("size")}
                   >
-                    Next: adjust size
+                    Next: size
                   </button>
                 </div>
               ) : null}
@@ -614,19 +715,105 @@ export function LittleLeafyGenerator() {
                   <button
                     className="press-button rounded-full bg-leaf-500 px-5 py-3 text-sm font-black text-white shadow-press"
                     type="button"
-                    onClick={() => setActiveStep("details")}
+                    onClick={() => setActiveStep("shape")}
                   >
-                    Next: details and export
+                    Next: shape and color
                   </button>
                 </div>
               ) : null}
 
-              {activeStep === "details" ? (
+              {activeStep === "shape" ? (
                 <div className="grid gap-3">
                   <div>
-                    <p className="text-base font-black text-stone-900">Finish the planter</p>
+                    <p className="text-base font-black text-stone-900">Choose the silhouette</p>
                     <p className="text-sm font-semibold text-stone-500">
-                      Choose texture, drainage, and export when it feels right.
+                      This controls the overall planter profile before texture is applied.
+                    </p>
+                  </div>
+                  <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
+                    <span className="text-sm font-semibold text-stone-700">Planter shape</span>
+                    <select
+                      className="mt-2 w-full rounded-full border border-leaf-100 bg-white px-4 py-3 text-sm font-bold text-leaf-700 outline-none ring-leaf-300 transition focus:ring-4"
+                      value={settings.profile}
+                      onChange={(event) => updateSetting("profile", event.target.value as PotProfile)}
+                    >
+                      {profileLabels.map((profile) => (
+                        <option key={profile.value} value={profile.value}>
+                          {profile.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="rounded-2xl bg-white/80 p-3">
+                    <p className="mb-2 text-sm font-black text-stone-800">Preview color</p>
+                    <div className="flex flex-wrap gap-2">
+                      {colorSwatches.map((swatch) => (
+                        <button
+                          key={swatch.value}
+                          className={`h-10 w-10 rounded-full border-4 shadow-sm transition ${
+                            previewColor === swatch.value
+                              ? "scale-105 border-lilac-500"
+                              : "border-white"
+                          }`}
+                          type="button"
+                          title={swatch.name}
+                          style={{ backgroundColor: swatch.value }}
+                          onClick={() => {
+                            setPreviewColor(swatch.value);
+                            setActiveTemplate("custom");
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    className="press-button rounded-full bg-leaf-500 px-5 py-3 text-sm font-black text-white shadow-press"
+                    type="button"
+                    onClick={() => setActiveStep("texture")}
+                  >
+                    Next: body texture
+                  </button>
+                </div>
+              ) : null}
+
+              {activeStep === "texture" ? (
+                <div className="grid gap-3">
+                  <div>
+                    <p className="text-base font-black text-stone-900">Choose body texture</p>
+                    <p className="text-sm font-semibold text-stone-500">
+                      These are generated as printable relief, not just a visual material.
+                    </p>
+                  </div>
+                  <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
+                    <span className="text-sm font-semibold text-stone-700">Surface style</span>
+                    <select
+                      className="mt-2 w-full rounded-full border border-lilac-100 bg-lilac-50 px-4 py-3 text-sm font-bold text-lilac-700 outline-none ring-leaf-300 transition focus:ring-4"
+                      value={settings.pattern}
+                      onChange={(event) => updateSetting("pattern", event.target.value as PatternStyle)}
+                    >
+                      {patternLabels.map((pattern) => (
+                        <option key={pattern.value} value={pattern.value}>
+                          {pattern.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="press-button rounded-full bg-leaf-500 px-5 py-3 text-sm font-black text-white shadow-press"
+                    type="button"
+                    onClick={() => setActiveStep("drainage")}
+                  >
+                    Next: drainage
+                  </button>
+                </div>
+              ) : null}
+
+              {activeStep === "drainage" ? (
+                <div className="grid gap-3">
+                  <div>
+                    <p className="text-base font-black text-stone-900">Set drainage</p>
+                    <p className="text-sm font-semibold text-stone-500">
+                      Choose whether the pot has holes and what pattern they use.
                     </p>
                   </div>
                   <div className="rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
@@ -677,21 +864,24 @@ export function LittleLeafyGenerator() {
                     </div>
                   </div>
 
-                  <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
-                    <span className="text-sm font-semibold text-stone-700">Surface style</span>
-                    <select
-                      className="mt-2 w-full rounded-full border border-lilac-100 bg-lilac-50 px-4 py-3 text-sm font-bold text-lilac-700 outline-none ring-leaf-300 transition focus:ring-4"
-                      value={settings.pattern}
-                      onChange={(event) => updateSetting("pattern", event.target.value as PatternStyle)}
-                    >
-                      {patternLabels.map((pattern) => (
-                        <option key={pattern.value} value={pattern.value}>
-                          {pattern.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <button
+                    className="press-button rounded-full bg-leaf-500 px-5 py-3 text-sm font-black text-white shadow-press"
+                    type="button"
+                    onClick={() => setActiveStep("base")}
+                  >
+                    Next: two-piece base
+                  </button>
+                </div>
+              ) : null}
 
+              {activeStep === "base" ? (
+                <div className="grid gap-3">
+                  <div>
+                    <p className="text-base font-black text-stone-900">Choose base construction</p>
+                    <p className="text-sm font-semibold text-stone-500">
+                      Make a one-piece planter or add a click-fit sleeve for a modern two-tone look.
+                    </p>
+                  </div>
                   <div className="rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
                     <div className="flex items-center justify-between gap-4">
                       <div>
@@ -712,26 +902,32 @@ export function LittleLeafyGenerator() {
                       </button>
                     </div>
                     {settings.twoPiece ? (
-                      <p className="mt-3 rounded-2xl bg-lilac-50 px-3 py-2 text-xs font-bold text-lilac-700">
-                        ZIP export includes separate body and snap-base STL files.
-                      </p>
+                      <div className="mt-3 grid gap-3">
+                        <p className="rounded-2xl bg-lilac-50 px-3 py-2 text-xs font-bold text-lilac-700">
+                          ZIP export includes separate body and snap-base STL files.
+                        </p>
+                        <div className="grid gap-2">
+                          {baseTextureLabels.map((texture) => (
+                            <button
+                              key={texture.value}
+                              className={`rounded-2xl border p-3 text-left transition ${
+                                settings.baseTexture === texture.value
+                                  ? "border-lilac-300 bg-lilac-50 text-lilac-700"
+                                  : "border-stone-100 bg-white text-stone-600"
+                              }`}
+                              type="button"
+                              onClick={() => updateSetting("baseTexture", texture.value)}
+                            >
+                              <span className="block text-sm font-black">{texture.label}</span>
+                              <span className="mt-1 block text-xs font-semibold text-stone-500">
+                                {texture.description}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     ) : null}
                   </div>
-
-                  <label className="block rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
-                    <span className="text-sm font-semibold text-stone-700">Planter shape</span>
-                    <select
-                      className="mt-2 w-full rounded-full border border-leaf-100 bg-white px-4 py-3 text-sm font-bold text-leaf-700 outline-none ring-leaf-300 transition focus:ring-4"
-                      value={settings.profile}
-                      onChange={(event) => updateSetting("profile", event.target.value as PotProfile)}
-                    >
-                      {profileLabels.map((profile) => (
-                        <option key={profile.value} value={profile.value}>
-                          {profile.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
                 </div>
               ) : null}
             </div>
