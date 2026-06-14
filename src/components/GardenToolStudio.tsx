@@ -163,6 +163,10 @@ function escapeXml(value: string) {
     .replaceAll("\"", "&quot;");
 }
 
+function labelDisplayText(label: string) {
+  return (label.trim() || "Basil").slice(0, 18);
+}
+
 function roundedRectShape(width: number, height: number, radius: number) {
   const shape = new Shape();
   const x = -width / 2;
@@ -264,8 +268,76 @@ function addPrintableIcon(group: Group, icon: LabelIcon, z: number) {
   addExtrudedShape(group, leafShape(8, 13), 1.2, -29, 2, z);
 }
 
+function printableIconSvg(icon: LabelIcon) {
+  if (icon === "cactus") {
+    return `
+      <rect x="-36.5" y="-7" width="7" height="14" rx="2.8"/>
+      <rect x="-40" y="-5.5" width="4" height="9" rx="2"/>
+      <rect x="-30" y="-2" width="4" height="8" rx="2"/>
+    `;
+  }
+
+  if (icon === "flower") {
+    return `
+      <ellipse cx="-33" cy="0" rx="2.8" ry="2.8"/>
+      <ellipse cx="-33" cy="6" rx="2.3" ry="2.9"/>
+      <ellipse cx="-33" cy="-6" rx="2.3" ry="2.9"/>
+      <ellipse cx="-39" cy="0" rx="2.3" ry="2.9"/>
+      <ellipse cx="-27" cy="0" rx="2.3" ry="2.9"/>
+      <rect x="-33.7" y="-16" width="1.4" height="12" rx="0.7"/>
+    `;
+  }
+
+  if (icon === "herb") {
+    return `
+      <rect x="-41" y="-12" width="16" height="8" rx="2.5"/>
+      <rect x="-33.65" y="-6.5" width="1.3" height="13" rx="0.65"/>
+      <path d="M-37 7 C-33.5 4 -33.5 -4 -37 -5 C-40.5 -4 -40.5 4 -37 7 Z"/>
+      <path d="M-29 8 C-25.5 5 -25.5 -3 -29 -4 C-32.5 -3 -32.5 5 -29 8 Z"/>
+      <path d="M-33 11 C-30 8 -30 2 -33 1 C-36 2 -36 8 -33 11 Z"/>
+    `;
+  }
+
+  if (icon === "leaf") {
+    return `
+      <rect x="-33.7" y="-9" width="1.4" height="16" rx="0.7"/>
+      <path d="M-37 10 C-33 6 -33 -6 -37 -8 C-41 -6 -41 6 -37 10 Z"/>
+      <path d="M-29 10 C-25 6 -25 -6 -29 -8 C-33 -6 -33 6 -29 10 Z"/>
+    `;
+  }
+
+  return `
+    <rect x="-33.7" y="-11.5" width="1.4" height="15" rx="0.7"/>
+    <path d="M-37 8.5 C-33 5 -33 -4.5 -37 -6.5 C-41 -4.5 -41 5 -37 8.5 Z"/>
+    <path d="M-29 8.5 C-25 5 -25 -4.5 -29 -6.5 C-33 -4.5 -33 5 -29 8.5 Z"/>
+  `;
+}
+
+function plantLabelSvgMarkup(label: string, icon: LabelIcon) {
+  const safeLabel = labelDisplayText(label);
+  const escapedLabel = escapeXml(safeLabel);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="94mm" height="63mm" viewBox="-47 -35 94 63">
+  <g fill="#f2fbf3" stroke="#25843e" stroke-width="1.4" stroke-linejoin="round">
+    <rect x="-47" y="-10" width="94" height="28" rx="7"/>
+    <path d="M-8 -10 H8 L0 -35 Z"/>
+  </g>
+  <g fill="#25843e">${printableIconSvg(icon)}</g>
+  <text x="-18" y="6" font-family="Arial, sans-serif" font-size="7.2" font-weight="800" fill="#253226">${escapedLabel}</text>
+</svg>`;
+}
+
+function PlantLabelPreview({ label, icon }: { label: string; icon: LabelIcon }) {
+  return (
+    <div
+      className="mx-auto w-full max-w-xl drop-shadow-sm"
+      dangerouslySetInnerHTML={{ __html: plantLabelSvgMarkup(label, icon) }}
+    />
+  );
+}
+
 function createPlantLabelObject(label: string, icon: LabelIcon) {
-  const safeLabel = label.trim() || "Basil";
+  const safeLabel = labelDisplayText(label);
   const group = new Group();
   const baseDepth = 2.4;
   const raisedDepth = 1.1;
@@ -281,7 +353,7 @@ function createPlantLabelObject(label: string, icon: LabelIcon) {
 
   addPrintableIcon(group, icon, baseDepth);
 
-  const textGeometry = new TextGeometry(safeLabel.slice(0, 18), {
+  const textGeometry = new TextGeometry(safeLabel, {
     font: labelFont,
     size: 7.2,
     depth: raisedDepth,
@@ -383,21 +455,9 @@ async function exportPlantLabelTo3mf(label: string, icon: LabelIcon) {
 
 function downloadPlantLabelSvg(label: string, icon: LabelIcon) {
   const safeLabel = label.trim() || "Basil";
-  const selectedIcon = labelIcons.find((option) => option.id === icon) ?? labelIcons[0];
-  const escapedLabel = safeLabel
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="520" height="180" viewBox="0 0 520 180">
-  <rect x="22" y="22" width="476" height="118" rx="44" fill="#f2fbf3" stroke="#25843e" stroke-width="8"/>
-  <path d="M260 140 L238 172 H282 Z" fill="#25843e"/>
-  <circle cx="84" cy="80" r="26" fill="#dbf5de"/>
-  <text x="84" y="96" text-anchor="middle" font-size="42">${selectedIcon.emoji}</text>
-  <text x="130" y="92" font-family="Arial, sans-serif" font-size="44" font-weight="800" fill="#253226">${escapedLabel}</text>
-</svg>`;
 
   downloadBlob(
-    new Blob([svg], { type: "image/svg+xml" }),
+    new Blob([plantLabelSvgMarkup(safeLabel, icon)], { type: "image/svg+xml" }),
     `${fileSafeName(safeLabel)}-plant-label.svg`,
   );
 }
@@ -550,20 +610,17 @@ export function GardenToolStudio({ initialTool }: { initialTool: GardenTool }) {
                   </button>
                 </div>
                 <p className="rounded-2xl bg-white/70 p-4 text-sm font-semibold text-stone-500">
-                  STL and 3MF exports are shallow raised-name tags, sized in millimeters for
-                  easy scaling in your slicer.
+                  The preview uses the same simplified printable layout as the exported files.
+                  STL and 3MF add shallow raised depth for printing.
                 </p>
               </div>
               <div className="rounded-[2rem] bg-white p-6 shadow-sm">
-                <div className="rounded-[2rem] border-4 border-leaf-700 bg-leaf-50 px-6 py-8 text-center shadow-inner">
-                  <span className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-full bg-leaf-100 text-4xl">
-                    {labelIcons.find((icon) => icon.id === labelIcon)?.emoji ?? "🌿"}
-                  </span>
-                  <p className="truncate text-4xl font-black text-stone-900">
-                    {labelText || "Basil"}
-                  </p>
+                <div className="rounded-[2rem] bg-leaf-50 p-6 shadow-inner">
+                  <PlantLabelPreview label={labelText} icon={labelIcon} />
                 </div>
-                <div className="mx-auto h-16 w-12 bg-leaf-700 [clip-path:polygon(50%_100%,0_0,100%_0)]" />
+                <p className="mt-4 text-center text-xs font-black uppercase tracking-[0.14em] text-leaf-700">
+                  Export-matched preview
+                </p>
               </div>
             </div>
           ) : null}
