@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Heart } from "lucide-react";
 
 const toolLinks = [
   { href: "/tools/labels", label: "Plant labels" },
@@ -62,11 +62,12 @@ export function SiteNav() {
           ))}
 
           <a
-            className="support-button rounded-full bg-lilac-500 px-4 py-2 text-sm font-black text-white shadow-press"
+            className="support-button inline-flex items-center gap-2 rounded-full bg-lilac-500 px-4 py-2 text-sm font-black text-white shadow-press"
             href="https://store.heyrivo.com/donate"
             rel="noopener noreferrer"
             target="_blank"
           >
+            <Heart className="h-4 w-4 fill-none stroke-[2.5]" aria-hidden="true" />
             Support Us
           </a>
         </div>
