@@ -76,6 +76,7 @@ type PotTemplate = {
 type BuilderStep = "style" | "size" | "shape" | "texture" | "drainage" | "base";
 type UnitSystem = "metric" | "imperial";
 type UnitChoice = "auto" | UnitSystem;
+type ExportFormat = "stl" | "zip" | "3mf";
 
 const stepLabels: Array<{
   id: BuilderStep;
@@ -446,37 +447,6 @@ function getMaterialSuggestions(settings: PotSettings) {
   return suggestions.slice(0, 3);
 }
 
-function TemplatePreview({ template }: { template: PotTemplate }) {
-  const isSquare = template.settings.profile === "square";
-  const hasTexture = template.settings.pattern !== "smooth";
-
-  return (
-    <span className="relative flex h-16 w-16 shrink-0 items-end justify-center overflow-hidden rounded-2xl border-4 border-white bg-cream shadow-inner">
-      <span
-        className={`absolute bottom-2 h-10 w-11 shadow-sm ${
-          isSquare ? "rounded-lg" : "rounded-b-2xl rounded-t-lg"
-        }`}
-        style={{
-          backgroundColor: template.color,
-          clipPath: isSquare
-            ? "polygon(10% 0, 90% 0, 78% 100%, 22% 100%)"
-            : "polygon(4% 0, 96% 0, 76% 100%, 24% 100%)",
-        }}
-      />
-      <span
-        className="absolute bottom-[2.55rem] h-3 w-14 rounded-full shadow-sm"
-        style={{ backgroundColor: template.color }}
-      />
-      {hasTexture ? (
-        <span className="absolute bottom-3 h-8 w-9 rounded-b-2xl opacity-30 template-texture" />
-      ) : null}
-      {template.settings.twoPiece ? (
-        <span className="absolute bottom-1 h-3 w-11 rounded-b-xl bg-amber-700/80" />
-      ) : null}
-    </span>
-  );
-}
-
 function RangeControl({
   label,
   value,
@@ -613,7 +583,9 @@ function scratchSettings(): PotSettings {
 
 export function LittleLeafyGenerator() {
   const [settings, setSettings] = useState<PotSettings>(defaultSettings);
-  const [exporting, setExporting] = useState<"stl" | "zip" | "3mf" | null>(null);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [pendingExport, setPendingExport] = useState<ExportFormat | null>(null);
+  const [showDirections, setShowDirections] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [pulseKey, setPulseKey] = useState(0);
   const [activeTemplate, setActiveTemplate] = useState("soft-bowl");
@@ -669,6 +641,28 @@ export function LittleLeafyGenerator() {
   function showToast(message = "Your pot is ready 🌱") {
     setToast(message);
     window.setTimeout(() => setToast(null), 2400);
+  }
+
+  function requestExport(format: ExportFormat) {
+    setPendingExport(format);
+  }
+
+  async function finishExport(format: ExportFormat) {
+    setPendingExport(null);
+
+    if (format === "stl") {
+      await exportStl();
+    }
+
+    if (format === "zip") {
+      await exportZip();
+    }
+
+    if (format === "3mf") {
+      await export3mf();
+    }
+
+    setShowDirections(true);
   }
 
   async function exportStl() {
@@ -882,7 +876,7 @@ export function LittleLeafyGenerator() {
                     {templates.map((template) => (
                       <button
                         key={template.id}
-                        className={`press-button grid grid-cols-[4rem_1fr] gap-3 rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 ${
+                        className={`press-button grid grid-cols-[3rem_1fr] gap-3 rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 ${
                           activeTemplate === template.id
                             ? "border-leaf-300 bg-white text-leaf-700"
                             : "border-white/80 bg-white/75 text-stone-700"
@@ -890,7 +884,14 @@ export function LittleLeafyGenerator() {
                         type="button"
                         onClick={() => applyTemplate(template)}
                       >
-                        <TemplatePreview template={template} />
+                        <span
+                          className="relative h-12 w-12 overflow-hidden rounded-2xl border-4 border-white shadow-inner"
+                          style={{ backgroundColor: template.color }}
+                        >
+                          {template.settings.twoPiece ? (
+                            <span className="absolute inset-x-1 bottom-1 h-2 rounded-full bg-amber-800/70" />
+                          ) : null}
+                        </span>
                         <span>
                           <span className="mb-1 inline-flex rounded-full bg-white px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-stone-400 shadow-sm">
                             {template.category}
@@ -1224,60 +1225,11 @@ export function LittleLeafyGenerator() {
                   : `${formatDimension(settings.height)} × ${formatDimension(settings.topDiameter)}`}
               </div>
             </div>
-
-            <div className="mt-4 grid gap-3 rounded-2xl border border-white/80 bg-white/78 p-3 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black text-stone-900">Print check</p>
-                  <p className="text-xs font-semibold text-stone-500">
-                    Quick guidance before exporting.
-                  </p>
-                </div>
-                <span
-                  className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${
-                    printWarnings.length
-                      ? "bg-amber-50 text-amber-700"
-                      : "bg-leaf-50 text-leaf-700"
-                  }`}
-                >
-                  {printWarnings.length ? `${printWarnings.length} note${printWarnings.length > 1 ? "s" : ""}` : "Looks good"}
-                </span>
-              </div>
-
-              {printWarnings.length ? (
-                <div className="grid gap-2">
-                  {printWarnings.map((warning) => (
-                    <p
-                      key={warning}
-                      className="flex gap-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800"
-                    >
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{warning}</span>
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-2xl bg-leaf-50 px-3 py-2 text-xs font-bold text-leaf-700">
-                  These settings are nicely balanced for a typical desktop FDM print.
-                </p>
-              )}
-
-              <div className="rounded-2xl bg-lilac-50/70 p-3">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-lilac-700">
-                  Filament ideas
-                </p>
-                <ul className="mt-2 grid gap-1 text-xs font-semibold text-stone-600">
-                  {materialSuggestions.map((suggestion) => (
-                    <li key={suggestion}>• {suggestion}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
           </aside>
 
           <section
             id="preview"
-            className={`animate-fade-up relative flex min-h-[460px] scroll-mt-4 flex-col overflow-hidden rounded-3xl border border-white/80 bg-white/86 shadow-soft backdrop-blur sm:min-h-[520px] lg:sticky lg:top-5 lg:max-h-[760px] lg:self-start [animation-delay:220ms] ${
+            className={`animate-fade-up relative flex min-h-[460px] scroll-mt-4 flex-col overflow-hidden rounded-3xl border border-white/80 bg-white/86 shadow-soft backdrop-blur sm:min-h-[560px] lg:self-start [animation-delay:220ms] ${
               pulseKey ? "animate-pop" : ""
             }`}
           >
@@ -1307,7 +1259,7 @@ export function LittleLeafyGenerator() {
                 className="press-button inline-flex items-center justify-center gap-2 rounded-full bg-leaf-500 px-5 py-4 text-sm font-black text-white shadow-press hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
                 type="button"
                 disabled={Boolean(exporting)}
-                onClick={exportStl}
+                onClick={() => requestExport("stl")}
               >
                 <Download className="h-5 w-5" />
                 {exporting === "stl" ? "Sprouting your file..." : "Download STL"}
@@ -1316,7 +1268,7 @@ export function LittleLeafyGenerator() {
                 className="press-button inline-flex items-center justify-center gap-2 rounded-full bg-lilac-500 px-5 py-4 text-sm font-black text-white shadow-press hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
                 type="button"
                 disabled={Boolean(exporting)}
-                onClick={exportZip}
+                onClick={() => requestExport("zip")}
               >
                 <Package className="h-5 w-5" />
                 {exporting === "zip" ? "Sprouting your file..." : "Download ZIP"}
@@ -1325,7 +1277,7 @@ export function LittleLeafyGenerator() {
                 className="press-button inline-flex items-center justify-center gap-2 rounded-full bg-stone-900 px-5 py-4 text-sm font-black text-white shadow-press hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
                 type="button"
                 disabled={Boolean(exporting)}
-                onClick={export3mf}
+                onClick={() => requestExport("3mf")}
               >
                 <Sparkles className="h-5 w-5" />
                 {exporting === "3mf" ? "Sprouting your file..." : "Download 3MF"}
@@ -1385,8 +1337,111 @@ export function LittleLeafyGenerator() {
         </footer>
       </div>
 
+      {pendingExport ? (
+        <div className="fixed inset-0 z-50 flex items-end bg-stone-950/28 px-3 pb-3 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6">
+          <div className="w-full max-w-xl rounded-3xl border border-white/80 bg-white p-5 shadow-soft">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xl font-black text-stone-950">Quick print check</p>
+                <p className="mt-1 text-sm font-semibold text-stone-500">
+                  A few things to review before downloading your file.
+                </p>
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${
+                  printWarnings.length
+                    ? "bg-amber-50 text-amber-700"
+                    : "bg-leaf-50 text-leaf-700"
+                }`}
+              >
+                {printWarnings.length ? `${printWarnings.length} note${printWarnings.length > 1 ? "s" : ""}` : "Looks good"}
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-2">
+              {printWarnings.length ? (
+                printWarnings.map((warning) => (
+                  <p
+                    key={warning}
+                    className="flex gap-2 rounded-2xl bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800"
+                  >
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{warning}</span>
+                  </p>
+                ))
+              ) : (
+                <p className="rounded-2xl bg-leaf-50 px-3 py-2 text-sm font-bold text-leaf-700">
+                  These settings look balanced for a typical desktop FDM print.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-4 rounded-2xl bg-lilac-50/70 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-lilac-700">
+                Filament ideas
+              </p>
+              <ul className="mt-2 grid gap-1 text-sm font-semibold text-stone-600">
+                {materialSuggestions.map((suggestion) => (
+                  <li key={suggestion}>• {suggestion}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-[0.8fr_1.2fr]">
+              <button
+                className="press-button rounded-full border border-stone-200 bg-white px-5 py-3 text-sm font-black text-stone-600 shadow-press"
+                type="button"
+                onClick={() => setPendingExport(null)}
+              >
+                Keep editing
+              </button>
+              <button
+                className="press-button rounded-full bg-leaf-500 px-5 py-3 text-sm font-black text-white shadow-press disabled:cursor-wait disabled:opacity-70"
+                type="button"
+                disabled={Boolean(exporting)}
+                onClick={() => finishExport(pendingExport)}
+              >
+                {exporting
+                  ? "Sprouting your file..."
+                  : `Download ${pendingExport.toUpperCase()}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showDirections ? (
+        <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-2xl rounded-3xl border border-leaf-100 bg-white p-5 shadow-soft">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-lg font-black text-stone-950">Your file downloaded</p>
+              <p className="mt-1 text-sm font-semibold text-stone-500">
+                Next steps for the best print.
+              </p>
+              <ul className="mt-3 grid gap-1 text-sm font-bold text-stone-600">
+                <li>• Open the file in your slicer and confirm the scale is in millimeters.</li>
+                <li>• Print the planter upside down for a cleaner rim and fewer supports.</li>
+                <li>• Use PETG for outdoor or damp planters; PLA is great for indoor decor.</li>
+                <li>• For two-piece pots, print both parts separately before test fitting.</li>
+              </ul>
+            </div>
+            <button
+              className="press-button shrink-0 rounded-full bg-lilac-500 px-5 py-3 text-sm font-black text-white shadow-press"
+              type="button"
+              onClick={() => setShowDirections(false)}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {toast ? (
-        <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-full border border-leaf-200 bg-white px-5 py-3 text-sm font-black text-leaf-700 shadow-soft">
+        <div
+          className={`fixed left-1/2 z-50 -translate-x-1/2 rounded-full border border-leaf-200 bg-white px-5 py-3 text-sm font-black text-leaf-700 shadow-soft ${
+            showDirections ? "bottom-56" : "bottom-5"
+          }`}
+        >
           {toast}
         </div>
       ) : null}
