@@ -14,7 +14,7 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
-import { Suspense, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { DoubleSide, type Mesh } from "three";
 import {
   createPotGeometry,
@@ -70,6 +70,8 @@ type PotTemplate = {
 };
 
 type BuilderStep = "style" | "size" | "shape" | "texture" | "drainage" | "base";
+type UnitSystem = "metric" | "imperial";
+type UnitChoice = "auto" | UnitSystem;
 
 const stepLabels: Array<{
   id: BuilderStep;
@@ -313,6 +315,56 @@ const tips = [
   "Try a pale filament for a ceramic look.",
 ];
 
+const unitChoices: Array<{
+  value: UnitChoice;
+  flag: string;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "auto",
+    flag: "🧭",
+    label: "Auto",
+    description: "Use my browser region",
+  },
+  {
+    value: "imperial",
+    flag: "🇺🇸",
+    label: "United States",
+    description: "Show inches",
+  },
+  {
+    value: "metric",
+    flag: "🌍",
+    label: "Metric",
+    description: "Show millimeters",
+  },
+];
+
+function detectUnitSystem(): UnitSystem {
+  if (typeof navigator === "undefined") {
+    return "metric";
+  }
+
+  const locale = navigator.languages?.[0] ?? navigator.language;
+
+  try {
+    const region = new Intl.Locale(locale).region;
+    return region === "US" || region === "LR" || region === "MM" ? "imperial" : "metric";
+  } catch {
+    return locale.toLowerCase().includes("-us") ? "imperial" : "metric";
+  }
+}
+
+function formatMillimeters(value: number, unitSystem: UnitSystem) {
+  if (unitSystem === "imperial") {
+    const inches = value / 25.4;
+    return `${Number.isInteger(inches) ? inches.toFixed(0) : inches.toFixed(2)}in`;
+  }
+
+  return `${Math.round(value)}mm`;
+}
+
 function RangeControl({
   label,
   value,
@@ -320,6 +372,7 @@ function RangeControl({
   max,
   step = 1,
   unit = "mm",
+  displayValue,
   onChange,
 }: {
   label: string;
@@ -328,6 +381,7 @@ function RangeControl({
   max: number;
   step?: number;
   unit?: string;
+  displayValue?: string;
   onChange: (value: number) => void;
 }) {
   return (
@@ -335,8 +389,7 @@ function RangeControl({
       <span className="flex items-center justify-between gap-4 text-sm font-semibold text-stone-700">
         {label}
         <span className="rounded-full bg-lilac-50 px-2.5 py-1 text-xs text-lilac-700">
-          {value}
-          {unit}
+          {displayValue ?? `${value}${unit}`}
         </span>
       </span>
       <input
@@ -454,11 +507,39 @@ export function LittleLeafyGenerator() {
   const [activeTemplate, setActiveTemplate] = useState("soft-bowl");
   const [activeStep, setActiveStep] = useState<BuilderStep>("style");
   const [previewColor, setPreviewColor] = useState(templates[1].color);
+  const [unitChoice, setUnitChoice] = useState<UnitChoice>("auto");
+  const [detectedUnitSystem, setDetectedUnitSystem] = useState<UnitSystem>("metric");
   const activeTip = tips[pulseKey % tips.length];
+  const unitSystem = unitChoice === "auto" ? detectedUnitSystem : unitChoice;
+  const activeUnitChoice =
+    unitChoices.find((choice) => choice.value === unitChoice) ?? unitChoices[0];
+  const unitLabel = unitSystem === "imperial" ? "inches" : "millimeters";
+
+  useEffect(() => {
+    setDetectedUnitSystem(detectUnitSystem());
+
+    const savedUnitChoice = window.localStorage.getItem("littleleafy-unit-choice");
+    if (
+      savedUnitChoice === "auto" ||
+      savedUnitChoice === "metric" ||
+      savedUnitChoice === "imperial"
+    ) {
+      setUnitChoice(savedUnitChoice);
+    }
+  }, []);
+
+  function changeUnitChoice(value: UnitChoice) {
+    setUnitChoice(value);
+    window.localStorage.setItem("littleleafy-unit-choice", value);
+  }
 
   function updateSetting<Key extends keyof PotSettings>(key: Key, value: PotSettings[Key]) {
     setSettings((current) => ({ ...current, [key]: value }));
     setActiveTemplate("custom");
+  }
+
+  function formatDimension(value: number) {
+    return formatMillimeters(value, unitSystem);
   }
 
   function showToast() {
@@ -707,11 +788,46 @@ export function LittleLeafyGenerator() {
                       Keep walls at least 2-3mm for easier printing.
                     </p>
                   </div>
-                  <RangeControl label="Pot height" value={settings.height} min={50} max={160} onChange={(value) => updateSetting("height", value)} />
-                  <RangeControl label="Top diameter" value={settings.topDiameter} min={55} max={150} onChange={(value) => updateSetting("topDiameter", value)} />
-                  <RangeControl label="Bottom diameter" value={settings.bottomDiameter} min={35} max={120} onChange={(value) => updateSetting("bottomDiameter", value)} />
-                  <RangeControl label="Wall thickness" value={settings.wallThickness} min={2} max={7} onChange={(value) => updateSetting("wallThickness", value)} />
-                  <RangeControl label="Rim thickness" value={settings.rimThickness} min={2} max={14} onChange={(value) => updateSetting("rimThickness", value)} />
+                  <RangeControl
+                    label="Pot height"
+                    value={settings.height}
+                    min={50}
+                    max={160}
+                    displayValue={formatDimension(settings.height)}
+                    onChange={(value) => updateSetting("height", value)}
+                  />
+                  <RangeControl
+                    label="Top diameter"
+                    value={settings.topDiameter}
+                    min={55}
+                    max={150}
+                    displayValue={formatDimension(settings.topDiameter)}
+                    onChange={(value) => updateSetting("topDiameter", value)}
+                  />
+                  <RangeControl
+                    label="Bottom diameter"
+                    value={settings.bottomDiameter}
+                    min={35}
+                    max={120}
+                    displayValue={formatDimension(settings.bottomDiameter)}
+                    onChange={(value) => updateSetting("bottomDiameter", value)}
+                  />
+                  <RangeControl
+                    label="Wall thickness"
+                    value={settings.wallThickness}
+                    min={2}
+                    max={7}
+                    displayValue={formatDimension(settings.wallThickness)}
+                    onChange={(value) => updateSetting("wallThickness", value)}
+                  />
+                  <RangeControl
+                    label="Rim thickness"
+                    value={settings.rimThickness}
+                    min={2}
+                    max={14}
+                    displayValue={formatDimension(settings.rimThickness)}
+                    onChange={(value) => updateSetting("rimThickness", value)}
+                  />
                   <button
                     className="press-button rounded-full bg-leaf-500 px-5 py-3 text-sm font-black text-white shadow-press"
                     type="button"
@@ -943,7 +1059,9 @@ export function LittleLeafyGenerator() {
                 <span className="block text-xs uppercase tracking-[0.12em] text-stone-400">
                   Build
                 </span>
-                {settings.twoPiece ? "Two-piece snap fit" : `${settings.height} x ${settings.topDiameter}mm`}
+                {settings.twoPiece
+                  ? "Two-piece snap fit"
+                  : `${formatDimension(settings.height)} × ${formatDimension(settings.topDiameter)}`}
               </div>
             </div>
           </aside>
@@ -1027,8 +1145,29 @@ export function LittleLeafyGenerator() {
           </section>
         </section>
 
-        <footer className="py-5 text-center text-sm font-semibold text-stone-500">
-          Made for plant people, makers, and tiny desk gardens.
+        <footer className="flex flex-col items-center justify-between gap-3 py-5 text-sm font-semibold text-stone-500 sm:flex-row">
+          <span>Made for plant people, makers, and tiny desk gardens.</span>
+          <label className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-3 py-2 shadow-sm backdrop-blur">
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
+              Units
+            </span>
+            <span className="text-base" aria-hidden="true">
+              {activeUnitChoice.flag}
+            </span>
+            <select
+              className="max-w-[13rem] bg-transparent text-xs font-black text-stone-700 outline-none"
+              value={unitChoice}
+              onChange={(event) => changeUnitChoice(event.target.value as UnitChoice)}
+              aria-label="Choose unit system"
+            >
+              {unitChoices.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.flag} {choice.label} —{" "}
+                  {choice.value === "auto" ? `Auto ${unitLabel}` : choice.description}
+                </option>
+              ))}
+            </select>
+          </label>
         </footer>
       </div>
 
