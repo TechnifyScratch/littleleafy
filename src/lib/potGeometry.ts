@@ -7,6 +7,7 @@ import {
   MeshStandardMaterial,
   Vector3,
 } from "three";
+import JSZip from "jszip";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 
 export type PatternStyle =
@@ -533,6 +534,94 @@ function exportObjectToStl(object: Mesh | Group) {
   return exporter.parse(object, { binary: false }) as string;
 }
 
+function format3mfNumber(value: number) {
+  return Number.parseFloat(value.toFixed(5)).toString();
+}
+
+function transform3mfPoint(x: number, y: number, z: number, offsetX = 0) {
+  return {
+    x: x + offsetX,
+    y: z,
+    z: -y,
+  };
+}
+
+function geometryTo3mfMesh(geometry: BufferGeometry, offsetX = 0) {
+  const position = geometry.getAttribute("position");
+  const vertexLines: string[] = [];
+  const triangleLines: string[] = [];
+
+  for (let index = 0; index < position.count; index += 1) {
+    const point = transform3mfPoint(
+      position.getX(index),
+      position.getY(index),
+      position.getZ(index),
+      offsetX,
+    );
+
+    vertexLines.push(
+      `<vertex x="${format3mfNumber(point.x)}" y="${format3mfNumber(point.y)}" z="${format3mfNumber(point.z)}" />`,
+    );
+  }
+
+  for (let index = 0; index < position.count; index += 3) {
+    triangleLines.push(
+      `<triangle v1="${index}" v2="${index + 1}" v3="${index + 2}" />`,
+    );
+  }
+
+  return `<mesh><vertices>${vertexLines.join("")}</vertices><triangles>${triangleLines.join("")}</triangles></mesh>`;
+}
+
+function modelXml(objects: Array<{ id: number; name: string; mesh: string }>) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+  <metadata name="Title">LittleLeafy planter</metadata>
+  <metadata name="Designer">LittleLeafy</metadata>
+  <resources>
+    ${objects
+      .map(
+        (object) =>
+          `<object id="${object.id}" type="model" name="${object.name}">${object.mesh}</object>`,
+      )
+      .join("")}
+  </resources>
+  <build>
+    ${objects.map((object) => `<item objectid="${object.id}" />`).join("")}
+  </build>
+</model>`;
+}
+
+async function zip3mf(model: string) {
+  const zip = new JSZip();
+
+  zip.file(
+    "[Content_Types].xml",
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" />
+  <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml" />
+</Types>`,
+  );
+
+  zip.file(
+    "_rels/.rels",
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" />
+</Relationships>`,
+  );
+
+  zip.file("3D/3dmodel.model", model);
+
+  return zip.generateAsync({
+    type: "blob",
+    mimeType: "model/3mf",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+}
+
 export async function exportPotToStl(settings: PotSettings) {
   const potGeometry = createPotGeometry(settings);
 
@@ -571,6 +660,45 @@ export async function exportPotPartsToStl(settings: PotSettings) {
   const base = stlFromGeometry(baseGeometry);
 
   return { body, base };
+}
+
+export async function exportPotTo3mf(settings: PotSettings) {
+  const potGeometry = createPotGeometry(settings);
+
+  if (!settings.twoPiece) {
+    const model = modelXml([
+      {
+        id: 1,
+        name: "LittleLeafy planter",
+        mesh: geometryTo3mfMesh(potGeometry),
+      },
+    ]);
+    const blob = await zip3mf(model);
+    potGeometry.dispose();
+
+    return blob;
+  }
+
+  const baseGeometry = createSnapBaseGeometry(settings);
+  const separation = settings.topDiameter * 0.72;
+  const model = modelXml([
+    {
+      id: 1,
+      name: "LittleLeafy planter body",
+      mesh: geometryTo3mfMesh(potGeometry, -separation / 2),
+    },
+    {
+      id: 2,
+      name: "LittleLeafy snap base",
+      mesh: geometryTo3mfMesh(baseGeometry, separation / 2),
+    },
+  ]);
+  const blob = await zip3mf(model);
+
+  potGeometry.dispose();
+  baseGeometry.dispose();
+
+  return blob;
 }
 
 export function settingsReadme(settings: PotSettings) {

@@ -19,6 +19,7 @@ import { DoubleSide, type Mesh } from "three";
 import {
   createPotGeometry,
   createSnapBaseGeometry,
+  exportPotTo3mf,
   exportPotPartsToStl,
   exportPotToStl,
   type BaseTextureStyle,
@@ -497,7 +498,7 @@ function scratchSettings(): PotSettings {
 
 export function LittleLeafyGenerator() {
   const [settings, setSettings] = useState<PotSettings>(defaultSettings);
-  const [exporting, setExporting] = useState<"stl" | "zip" | null>(null);
+  const [exporting, setExporting] = useState<"stl" | "zip" | "3mf" | null>(null);
   const [toast, setToast] = useState(false);
   const [pulseKey, setPulseKey] = useState(0);
   const [activeTemplate, setActiveTemplate] = useState("soft-bowl");
@@ -566,6 +567,15 @@ export function LittleLeafyGenerator() {
     zip.file("README.txt", settingsReadme(settings));
     const blob = await zip.generateAsync({ type: "blob" });
     downloadBlob(blob, "little-leafy-planter.zip");
+    setExporting(null);
+    showToast();
+  }
+
+  async function export3mf() {
+    setExporting("3mf");
+    await new Promise((resolve) => window.setTimeout(resolve, 220));
+    const blob = await exportPotTo3mf(settings);
+    downloadBlob(blob, "little-leafy-planter.3mf");
     setExporting(null);
     showToast();
   }
@@ -1106,13 +1116,13 @@ export function LittleLeafyGenerator() {
                 {exporting === "zip" ? "Sprouting your file..." : "Download ZIP"}
               </button>
               <button
-                className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-full bg-stone-100 px-5 py-4 text-sm font-black text-stone-400 shadow-inner"
+                className="press-button inline-flex items-center justify-center gap-2 rounded-full bg-stone-900 px-5 py-4 text-sm font-black text-white shadow-press hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
                 type="button"
-                disabled
-                title="Coming soon"
+                disabled={Boolean(exporting)}
+                onClick={export3mf}
               >
                 <Sparkles className="h-5 w-5" />
-                3MF Coming soon
+                {exporting === "3mf" ? "Sprouting your file..." : "Download 3MF"}
               </button>
               <button
                 className="press-button inline-flex items-center justify-center gap-2 rounded-full border border-leaf-200 bg-white px-5 py-4 text-sm font-black text-leaf-700 shadow-press hover:brightness-105 md:col-span-2"
