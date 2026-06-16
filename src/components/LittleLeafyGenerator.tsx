@@ -1229,7 +1229,7 @@ export function LittleLeafyGenerator() {
 
           <section
             id="preview"
-            className={`animate-fade-up relative flex min-h-[460px] scroll-mt-4 flex-col overflow-hidden rounded-3xl border border-white/80 bg-white/86 shadow-soft backdrop-blur sm:min-h-[560px] lg:self-start [animation-delay:220ms] ${
+            className={`animate-fade-up relative flex min-h-[460px] scroll-mt-4 flex-col overflow-hidden rounded-3xl border border-white/80 bg-white/86 shadow-soft backdrop-blur sm:min-h-[560px] lg:h-[760px] lg:self-start [animation-delay:220ms] ${
               pulseKey ? "animate-pop" : ""
             }`}
           >
@@ -1241,7 +1241,7 @@ export function LittleLeafyGenerator() {
             </div>
 
             <div className="min-h-0 flex-1">
-              <Canvas shadows camera={{ position: [2.5, 2, 4.2], fov: 38 }}>
+              <Canvas className="h-full w-full" shadows camera={{ position: [2.5, 2, 4.2], fov: 38 }}>
                 <color attach="background" args={["#fffdf6"]} />
                 <ambientLight intensity={0.72} />
                 <directionalLight position={[3, 5, 4]} intensity={1.55} castShadow />
