@@ -317,27 +317,23 @@ const tips = [
 
 const unitChoices: Array<{
   value: UnitChoice;
-  flag: string;
   label: string;
   description: string;
 }> = [
   {
     value: "auto",
-    flag: "🧭",
     label: "Auto",
-    description: "Use my browser region",
+    description: "Browser region",
   },
   {
     value: "imperial",
-    flag: "🇺🇸",
-    label: "United States",
-    description: "Show inches",
+    label: "Inches",
+    description: "Imperial",
   },
   {
     value: "metric",
-    flag: "🌍",
-    label: "Metric",
-    description: "Show millimeters",
+    label: "Millimeters",
+    description: "Metric",
   },
 ];
 
@@ -511,8 +507,6 @@ export function LittleLeafyGenerator() {
   const [detectedUnitSystem, setDetectedUnitSystem] = useState<UnitSystem>("metric");
   const activeTip = tips[pulseKey % tips.length];
   const unitSystem = unitChoice === "auto" ? detectedUnitSystem : unitChoice;
-  const activeUnitChoice =
-    unitChoices.find((choice) => choice.value === unitChoice) ?? unitChoices[0];
   const unitLabel = unitSystem === "imperial" ? "inches" : "millimeters";
 
   useEffect(() => {
@@ -1151,19 +1145,15 @@ export function LittleLeafyGenerator() {
             <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
               Units
             </span>
-            <span className="text-base" aria-hidden="true">
-              {activeUnitChoice.flag}
-            </span>
             <select
-              className="max-w-[13rem] bg-transparent text-xs font-black text-stone-700 outline-none"
+              className="max-w-[11rem] bg-transparent text-xs font-black text-stone-700 outline-none"
               value={unitChoice}
               onChange={(event) => changeUnitChoice(event.target.value as UnitChoice)}
               aria-label="Choose unit system"
             >
               {unitChoices.map((choice) => (
                 <option key={choice.value} value={choice.value}>
-                  {choice.flag} {choice.label} —{" "}
-                  {choice.value === "auto" ? `Auto ${unitLabel}` : choice.description}
+                  {choice.label} — {choice.value === "auto" ? unitLabel : choice.description}
                 </option>
               ))}
             </select>
