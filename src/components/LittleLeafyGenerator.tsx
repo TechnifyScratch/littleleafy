@@ -4,6 +4,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, Environment, Html, OrbitControls } from "@react-three/drei";
 import JSZip from "jszip";
 import {
+  AlertTriangle,
   CheckCircle2,
   Download,
   Package,
@@ -11,6 +12,7 @@ import {
   RefreshCcw,
   RotateCcw,
   Ruler,
+  Share2,
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
@@ -66,6 +68,7 @@ type PotTemplate = {
   name: string;
   description: string;
   vibe: string;
+  category: string;
   color: string;
   settings: PotSettings;
 };
@@ -124,6 +127,7 @@ const templates: PotTemplate[] = [
     name: "Classic Garden",
     description: "Tapered outdoor pot with subtle ring detail.",
     vibe: "Inspired by patio planters",
+    category: "Outdoor",
     color: "#65a96b",
     settings: { ...classicSettings, pattern: "rings", rimThickness: 8 },
   },
@@ -132,6 +136,7 @@ const templates: PotTemplate[] = [
     name: "Ceramic Bowl",
     description: "Rounded patio shape with a thick soft rim.",
     vibe: "Smooth and modern",
+    category: "Indoor",
     color: "#c24646",
     settings: defaultSettings,
   },
@@ -140,6 +145,7 @@ const templates: PotTemplate[] = [
     name: "Cactus Cup",
     description: "Small tapered cup with a clean rolled lip.",
     vibe: "Great for succulents",
+    category: "Succulents",
     color: "#f0a36e",
     settings: {
       height: 78,
@@ -161,6 +167,7 @@ const templates: PotTemplate[] = [
     name: "Ribbed Cachepot",
     description: "Tall planter with print-friendly vertical texture.",
     vibe: "Maker-friendly texture",
+    category: "Two-piece",
     color: "#7f8580",
     settings: {
       height: 104,
@@ -182,6 +189,7 @@ const templates: PotTemplate[] = [
     name: "Arch Relief Pot",
     description: "Soft repeating arches inspired by ceramic texture.",
     vibe: "Statement texture",
+    category: "Decorative",
     color: "#e8e1d2",
     settings: {
       height: 92,
@@ -203,6 +211,7 @@ const templates: PotTemplate[] = [
     name: "Square Studio",
     description: "A faceted square planter with crisp sides.",
     vibe: "Minimal desktop style",
+    category: "Modern",
     color: "#8e8e87",
     settings: {
       height: 96,
@@ -362,6 +371,112 @@ function formatMillimeters(value: number, unitSystem: UnitSystem) {
   return `${Math.round(value)}mm`;
 }
 
+function encodeDesign(settings: PotSettings, color: string) {
+  const design = JSON.stringify({ settings, color });
+  return btoa(design).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeDesign(value: string) {
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const parsed = JSON.parse(atob(padded)) as {
+      settings?: Partial<PotSettings>;
+      color?: string;
+    };
+
+    if (!parsed.settings) {
+      return null;
+    }
+
+    return {
+      settings: { ...defaultSettings, ...parsed.settings },
+      color: parsed.color,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getPrintWarnings(settings: PotSettings) {
+  const warnings: string[] = [];
+
+  if (settings.wallThickness < 3) {
+    warnings.push("Wall thickness under 3mm can feel fragile on larger prints.");
+  }
+
+  if (settings.bottomDiameter < settings.topDiameter * 0.52) {
+    warnings.push("The base is quite narrow, so use heavier soil or widen the bottom for stability.");
+  }
+
+  if (settings.rimThickness > settings.wallThickness * 3.2) {
+    warnings.push("The rim is much thicker than the wall; preview slicer overhangs before printing.");
+  }
+
+  if (!settings.drainage) {
+    warnings.push("No drainage holes selected. Best for cachepots or plants in nursery inserts.");
+  }
+
+  if (settings.pattern === "arches" || settings.pattern === "geo") {
+    warnings.push("Relief textures look best with a 0.16–0.2mm layer height.");
+  }
+
+  if (settings.twoPiece) {
+    warnings.push("Print both snap-fit pieces before forcing the fit; scale the base by 101% if your printer runs tight.");
+  }
+
+  return warnings;
+}
+
+function getMaterialSuggestions(settings: PotSettings) {
+  const suggestions = ["PLA works well for indoor decorative planters."];
+
+  if (settings.drainage) {
+    suggestions.push("PETG is a safer pick for damp soil and sunny windowsills.");
+  }
+
+  if (settings.twoPiece) {
+    suggestions.push("Try matte PLA for the body and woodfill or tan PETG for the snap base.");
+  }
+
+  if (settings.pattern === "fluted" || settings.pattern === "spiral" || settings.pattern === "wave-ridges") {
+    suggestions.push("Silk or matte filament makes the raised texture pop.");
+  }
+
+  return suggestions.slice(0, 3);
+}
+
+function TemplatePreview({ template }: { template: PotTemplate }) {
+  const isSquare = template.settings.profile === "square";
+  const hasTexture = template.settings.pattern !== "smooth";
+
+  return (
+    <span className="relative flex h-16 w-16 shrink-0 items-end justify-center overflow-hidden rounded-2xl border-4 border-white bg-cream shadow-inner">
+      <span
+        className={`absolute bottom-2 h-10 w-11 shadow-sm ${
+          isSquare ? "rounded-lg" : "rounded-b-2xl rounded-t-lg"
+        }`}
+        style={{
+          backgroundColor: template.color,
+          clipPath: isSquare
+            ? "polygon(10% 0, 90% 0, 78% 100%, 22% 100%)"
+            : "polygon(4% 0, 96% 0, 76% 100%, 24% 100%)",
+        }}
+      />
+      <span
+        className="absolute bottom-[2.55rem] h-3 w-14 rounded-full shadow-sm"
+        style={{ backgroundColor: template.color }}
+      />
+      {hasTexture ? (
+        <span className="absolute bottom-3 h-8 w-9 rounded-b-2xl opacity-30 template-texture" />
+      ) : null}
+      {template.settings.twoPiece ? (
+        <span className="absolute bottom-1 h-3 w-11 rounded-b-xl bg-amber-700/80" />
+      ) : null}
+    </span>
+  );
+}
+
 function RangeControl({
   label,
   value,
@@ -499,7 +614,7 @@ function scratchSettings(): PotSettings {
 export function LittleLeafyGenerator() {
   const [settings, setSettings] = useState<PotSettings>(defaultSettings);
   const [exporting, setExporting] = useState<"stl" | "zip" | "3mf" | null>(null);
-  const [toast, setToast] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [pulseKey, setPulseKey] = useState(0);
   const [activeTemplate, setActiveTemplate] = useState("soft-bowl");
   const [activeStep, setActiveStep] = useState<BuilderStep>("style");
@@ -509,9 +624,23 @@ export function LittleLeafyGenerator() {
   const activeTip = tips[pulseKey % tips.length];
   const unitSystem = unitChoice === "auto" ? detectedUnitSystem : unitChoice;
   const unitLabel = unitSystem === "imperial" ? "inches" : "millimeters";
+  const printWarnings = getPrintWarnings(settings);
+  const materialSuggestions = getMaterialSuggestions(settings);
 
   useEffect(() => {
     setDetectedUnitSystem(detectUnitSystem());
+
+    const sharedDesign = new URLSearchParams(window.location.search).get("design");
+    if (sharedDesign) {
+      const decodedDesign = decodeDesign(sharedDesign);
+
+      if (decodedDesign) {
+        setSettings(decodedDesign.settings);
+        setPreviewColor(decodedDesign.color ?? templates[1].color);
+        setActiveTemplate("custom");
+        setActiveStep("size");
+      }
+    }
 
     const savedUnitChoice = window.localStorage.getItem("littleleafy-unit-choice");
     if (
@@ -537,9 +666,9 @@ export function LittleLeafyGenerator() {
     return formatMillimeters(value, unitSystem);
   }
 
-  function showToast() {
-    setToast(true);
-    window.setTimeout(() => setToast(false), 2400);
+  function showToast(message = "Your pot is ready 🌱") {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 2400);
   }
 
   async function exportStl() {
@@ -578,6 +707,27 @@ export function LittleLeafyGenerator() {
     downloadBlob(blob, "little-leafy-planter.3mf");
     setExporting(null);
     showToast();
+  }
+
+  async function shareDesign() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("design", encodeDesign(settings, previewColor));
+    const shareUrl = url.toString();
+
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        showToast("Share link copied");
+        return;
+      } catch {
+        window.prompt("Copy your LittleLeafy design link:", shareUrl);
+        showToast("Share link ready");
+        return;
+      }
+    }
+
+    window.prompt("Copy your LittleLeafy design link:", shareUrl);
+    showToast("Share link ready");
   }
 
   function applyTemplate(template: PotTemplate) {
@@ -646,6 +796,12 @@ export function LittleLeafyGenerator() {
                 <p className="text-sm font-medium text-stone-500">
                   Follow the steps, or jump around anytime.
                 </p>
+                <a
+                  className="mt-2 inline-flex rounded-full bg-leaf-50 px-3 py-1 text-xs font-black text-leaf-700 lg:hidden"
+                  href="#preview"
+                >
+                  Jump to preview
+                </a>
               </div>
               <button
                 className="press-button rounded-full border border-lilac-100 bg-lilac-50 p-3 text-lilac-700 shadow-press hover:brightness-105"
@@ -726,7 +882,7 @@ export function LittleLeafyGenerator() {
                     {templates.map((template) => (
                       <button
                         key={template.id}
-                        className={`press-button grid grid-cols-[3rem_1fr] gap-3 rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 ${
+                        className={`press-button grid grid-cols-[4rem_1fr] gap-3 rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 ${
                           activeTemplate === template.id
                             ? "border-leaf-300 bg-white text-leaf-700"
                             : "border-white/80 bg-white/75 text-stone-700"
@@ -734,11 +890,11 @@ export function LittleLeafyGenerator() {
                         type="button"
                         onClick={() => applyTemplate(template)}
                       >
-                        <span
-                          className="h-12 w-12 rounded-2xl border-4 border-white shadow-inner"
-                          style={{ backgroundColor: template.color }}
-                        />
+                        <TemplatePreview template={template} />
                         <span>
+                          <span className="mb-1 inline-flex rounded-full bg-white px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-stone-400 shadow-sm">
+                            {template.category}
+                          </span>
                           <span className="block text-sm font-black">{template.name}</span>
                           <span className="mt-1 block text-xs font-bold text-stone-500">
                             {template.description}
@@ -1068,10 +1224,60 @@ export function LittleLeafyGenerator() {
                   : `${formatDimension(settings.height)} × ${formatDimension(settings.topDiameter)}`}
               </div>
             </div>
+
+            <div className="mt-4 grid gap-3 rounded-2xl border border-white/80 bg-white/78 p-3 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-stone-900">Print check</p>
+                  <p className="text-xs font-semibold text-stone-500">
+                    Quick guidance before exporting.
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${
+                    printWarnings.length
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-leaf-50 text-leaf-700"
+                  }`}
+                >
+                  {printWarnings.length ? `${printWarnings.length} note${printWarnings.length > 1 ? "s" : ""}` : "Looks good"}
+                </span>
+              </div>
+
+              {printWarnings.length ? (
+                <div className="grid gap-2">
+                  {printWarnings.map((warning) => (
+                    <p
+                      key={warning}
+                      className="flex gap-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800"
+                    >
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{warning}</span>
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl bg-leaf-50 px-3 py-2 text-xs font-bold text-leaf-700">
+                  These settings are nicely balanced for a typical desktop FDM print.
+                </p>
+              )}
+
+              <div className="rounded-2xl bg-lilac-50/70 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-lilac-700">
+                  Filament ideas
+                </p>
+                <ul className="mt-2 grid gap-1 text-xs font-semibold text-stone-600">
+                  {materialSuggestions.map((suggestion) => (
+                    <li key={suggestion}>• {suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </aside>
 
           <section
-            className={`animate-fade-up relative flex min-h-[520px] flex-col overflow-hidden rounded-3xl border border-white/80 bg-white/86 shadow-soft backdrop-blur lg:max-h-[760px] [animation-delay:220ms] ${
+            id="preview"
+            className={`animate-fade-up relative flex min-h-[460px] scroll-mt-4 flex-col overflow-hidden rounded-3xl border border-white/80 bg-white/86 shadow-soft backdrop-blur sm:min-h-[520px] lg:sticky lg:top-5 lg:max-h-[760px] lg:self-start [animation-delay:220ms] ${
               pulseKey ? "animate-pop" : ""
             }`}
           >
@@ -1096,7 +1302,7 @@ export function LittleLeafyGenerator() {
               </Canvas>
             </div>
 
-            <div className="grid gap-3 border-t border-leaf-100 bg-white/82 p-4 md:grid-cols-[1fr_1fr_1fr]">
+            <div className="grid gap-3 border-t border-leaf-100 bg-white/82 p-4 md:grid-cols-3">
               <button
                 className="press-button inline-flex items-center justify-center gap-2 rounded-full bg-leaf-500 px-5 py-4 text-sm font-black text-white shadow-press hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
                 type="button"
@@ -1125,7 +1331,7 @@ export function LittleLeafyGenerator() {
                 {exporting === "3mf" ? "Sprouting your file..." : "Download 3MF"}
               </button>
               <button
-                className="press-button inline-flex items-center justify-center gap-2 rounded-full border border-leaf-200 bg-white px-5 py-4 text-sm font-black text-leaf-700 shadow-press hover:brightness-105 md:col-span-2"
+                className="press-button inline-flex items-center justify-center gap-2 rounded-full border border-leaf-200 bg-white px-5 py-4 text-sm font-black text-leaf-700 shadow-press hover:brightness-105"
                 type="button"
                 onClick={randomize}
               >
@@ -1144,6 +1350,14 @@ export function LittleLeafyGenerator() {
               >
                 <RotateCcw className="h-5 w-5" />
                 Reset
+              </button>
+              <button
+                className="press-button inline-flex items-center justify-center gap-2 rounded-full border border-lilac-200 bg-white px-5 py-4 text-sm font-black text-lilac-700 shadow-press hover:brightness-105"
+                type="button"
+                onClick={shareDesign}
+              >
+                <Share2 className="h-5 w-5" />
+                Share design
               </button>
             </div>
           </section>
@@ -1173,7 +1387,7 @@ export function LittleLeafyGenerator() {
 
       {toast ? (
         <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-full border border-leaf-200 bg-white px-5 py-3 text-sm font-black text-leaf-700 shadow-soft">
-          Your pot is ready 🌱
+          {toast}
         </div>
       ) : null}
     </main>
