@@ -70,6 +70,7 @@ type PotTemplate = {
   vibe: string;
   category: string;
   color: string;
+  special?: boolean;
   settings: PotSettings;
 };
 
@@ -227,6 +228,30 @@ const templates: PotTemplate[] = [
       profile: "square",
       twoPiece: false,
       baseTexture: "faceted",
+    },
+  },
+  {
+    id: "self-watering",
+    name: "Self-Watering Smart Pot",
+    description: "A sleek two-piece planter with wick openings and a snap-on reservoir sleeve.",
+    vibe: "Smart reservoir system",
+    category: "Special",
+    color: "#44b79a",
+    special: true,
+    settings: {
+      height: 112,
+      topDiameter: 104,
+      bottomDiameter: 82,
+      wallThickness: 3,
+      drainage: true,
+      drainageHoles: 5,
+      drainageStyle: "center-plus",
+      rimThickness: 7,
+      pattern: "smooth",
+      profile: "cylinder",
+      twoPiece: true,
+      baseTexture: "soft-rings",
+      selfWatering: true,
     },
   },
 ];
@@ -426,6 +451,10 @@ function getPrintWarnings(settings: PotSettings) {
     warnings.push("Print both snap-fit pieces before forcing the fit; scale the base by 101% if your printer runs tight.");
   }
 
+  if (settings.selfWatering) {
+    warnings.push("Keep the center wick openings clear in your slicer so water can reach the soil.");
+  }
+
   return warnings;
 }
 
@@ -438,6 +467,10 @@ function getMaterialSuggestions(settings: PotSettings) {
 
   if (settings.twoPiece) {
     suggestions.push("Try matte PLA for the body and woodfill or tan PETG for the snap base.");
+  }
+
+  if (settings.selfWatering) {
+    suggestions.push("PETG is recommended for the reservoir sleeve because it handles moisture better.");
   }
 
   if (settings.pattern === "fluted" || settings.pattern === "spiral" || settings.pattern === "wave-ridges") {
@@ -578,6 +611,7 @@ function scratchSettings(): PotSettings {
     profile: "classic",
     twoPiece: false,
     baseTexture: "cork",
+    selfWatering: false,
   };
 }
 
@@ -746,6 +780,7 @@ export function LittleLeafyGenerator() {
       drainageStyle: drainageOptions[randomBetween(0, drainageOptions.length - 1)].value,
       twoPiece: Math.random() > 0.66,
       baseTexture: baseTextureLabels[randomBetween(0, baseTextureLabels.length - 1)].value,
+      selfWatering: false,
     });
     setPreviewColor(colorSwatches[randomBetween(0, colorSwatches.length - 1)].value);
     setActiveTemplate("custom");
@@ -877,30 +912,59 @@ export function LittleLeafyGenerator() {
                       <button
                         key={template.id}
                         className={`press-button grid grid-cols-[3rem_1fr] gap-3 rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 ${
-                          activeTemplate === template.id
-                            ? "border-leaf-300 bg-white text-leaf-700"
-                            : "border-white/80 bg-white/75 text-stone-700"
+                          template.special
+                            ? activeTemplate === template.id
+                              ? "border-lilac-300 bg-gradient-to-br from-leaf-500 via-emerald-500 to-lilac-500 text-white shadow-soft"
+                              : "border-transparent bg-gradient-to-br from-leaf-500 via-emerald-500 to-lilac-500 text-white shadow-soft"
+                            : activeTemplate === template.id
+                              ? "border-leaf-300 bg-white text-leaf-700"
+                              : "border-white/80 bg-white/75 text-stone-700"
                         }`}
                         type="button"
                         onClick={() => applyTemplate(template)}
                       >
                         <span
-                          className="relative h-12 w-12 overflow-hidden rounded-2xl border-4 border-white shadow-inner"
-                          style={{ backgroundColor: template.color }}
+                          className={`relative h-12 w-12 overflow-hidden rounded-2xl border-4 border-white shadow-inner ${
+                            template.special ? "bg-white/90" : ""
+                          }`}
+                          style={template.special ? undefined : { backgroundColor: template.color }}
                         >
+                          {template.special ? (
+                            <span className="absolute inset-2 rounded-full bg-gradient-to-br from-leaf-400 to-lilac-400" />
+                          ) : null}
                           {template.settings.twoPiece ? (
-                            <span className="absolute inset-x-1 bottom-1 h-2 rounded-full bg-amber-800/70" />
+                            <span
+                              className={`absolute inset-x-1 bottom-1 h-2 rounded-full ${
+                                template.special ? "bg-stone-950/35" : "bg-amber-800/70"
+                              }`}
+                            />
                           ) : null}
                         </span>
                         <span>
-                          <span className="mb-1 inline-flex rounded-full bg-white px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-stone-400 shadow-sm">
+                          <span
+                            className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] shadow-sm ${
+                              template.special
+                                ? "bg-white/20 text-white"
+                                : "bg-white text-stone-400"
+                            }`}
+                          >
                             {template.category}
                           </span>
                           <span className="block text-sm font-black">{template.name}</span>
-                          <span className="mt-1 block text-xs font-bold text-stone-500">
+                          <span
+                            className={`mt-1 block text-xs font-bold ${
+                              template.special ? "text-white/90" : "text-stone-500"
+                            }`}
+                          >
                             {template.description}
                           </span>
-                          <span className="mt-2 inline-flex rounded-full bg-lilac-50 px-2 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-lilac-700">
+                          <span
+                            className={`mt-2 inline-flex rounded-full px-2 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${
+                              template.special
+                                ? "bg-white text-lilac-700"
+                                : "bg-lilac-50 text-lilac-700"
+                            }`}
+                          >
                             {template.vibe}
                           </span>
                         </span>
@@ -1164,7 +1228,9 @@ export function LittleLeafyGenerator() {
                       <div>
                         <p className="text-sm font-semibold text-stone-700">Two-piece snap pot</p>
                         <p className="text-xs font-medium text-stone-500">
-                          Adds a cork-textured base sleeve that clicks over a lower bead.
+                          {settings.selfWatering
+                            ? "Adds a snap-on reservoir sleeve with wick access through the bottom openings."
+                            : "Adds a cork-textured base sleeve that clicks over a lower bead."}
                         </p>
                       </div>
                       <button
@@ -1181,7 +1247,9 @@ export function LittleLeafyGenerator() {
                     {settings.twoPiece ? (
                       <div className="mt-3 grid gap-3">
                         <p className="rounded-2xl bg-lilac-50 px-3 py-2 text-xs font-bold text-lilac-700">
-                          ZIP export includes separate body and snap-base STL files.
+                          {settings.selfWatering
+                            ? "ZIP export includes a planter body plus a separate reservoir sleeve STL."
+                            : "ZIP export includes separate body and snap-base STL files."}
                         </p>
                         <div className="grid gap-2">
                           {baseTextureLabels.map((texture) => (
@@ -1237,7 +1305,11 @@ export function LittleLeafyGenerator() {
               Live preview
             </div>
             <div className="absolute right-4 top-4 z-10 rounded-full bg-lilac-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-lilac-700 shadow-sm">
-              {settings.twoPiece ? "Two-piece STL" : "Printable STL"}
+              {settings.selfWatering
+                ? "Self-watering STL"
+                : settings.twoPiece
+                  ? "Two-piece STL"
+                  : "Printable STL"}
             </div>
 
             <div className="min-h-0 flex-1">
@@ -1423,6 +1495,9 @@ export function LittleLeafyGenerator() {
                 <li>• Print the planter upside down for a cleaner rim and fewer supports.</li>
                 <li>• Use PETG for outdoor or damp planters; PLA is great for indoor decor.</li>
                 <li>• For two-piece pots, print both parts separately before test fitting.</li>
+                {settings.selfWatering ? (
+                  <li>• Add cotton wick through the center openings and fill the sleeve only below the pot floor.</li>
+                ) : null}
               </ul>
             </div>
             <button

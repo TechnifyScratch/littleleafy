@@ -38,6 +38,7 @@ export type PotSettings = {
   profile: PotProfile;
   twoPiece?: boolean;
   baseTexture?: BaseTextureStyle;
+  selfWatering?: boolean;
 };
 
 const SEGMENTS = 96;
@@ -573,16 +574,21 @@ function geometryTo3mfMesh(geometry: BufferGeometry, offsetX = 0) {
   return `<mesh><vertices>${vertexLines.join("")}</vertices><triangles>${triangleLines.join("")}</triangles></mesh>`;
 }
 
-function modelXml(objects: Array<{ id: number; name: string; mesh: string }>) {
+function modelXml(objects: Array<{ id: number; name: string; mesh: string; materialIndex: number }>) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
   <metadata name="Title">LittleLeafy planter</metadata>
   <metadata name="Designer">LittleLeafy</metadata>
+  <metadata name="Application">LittleLeafy browser planter studio</metadata>
   <resources>
+    <basematerials id="1">
+      <base name="Planter body" displaycolor="#62B06AFF" />
+      <base name="Snap base or reservoir" displaycolor="#B8793FFF" />
+    </basematerials>
     ${objects
       .map(
         (object) =>
-          `<object id="${object.id}" type="model" name="${object.name}">${object.mesh}</object>`,
+          `<object id="${object.id}" type="model" name="${object.name}" pid="1" pindex="${object.materialIndex}">${object.mesh}</object>`,
       )
       .join("")}
   </resources>
@@ -601,6 +607,8 @@ async function zip3mf(model: string) {
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" />
   <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml" />
+  <Override PartName="/3D/3dmodel.model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml" />
+  <Override PartName="/_rels/.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" />
 </Types>`,
   );
 
@@ -668,8 +676,9 @@ export async function exportPotTo3mf(settings: PotSettings) {
   if (!settings.twoPiece) {
     const model = modelXml([
       {
-        id: 1,
+        id: 2,
         name: "LittleLeafy planter",
+        materialIndex: 0,
         mesh: geometryTo3mfMesh(potGeometry),
       },
     ]);
@@ -683,13 +692,15 @@ export async function exportPotTo3mf(settings: PotSettings) {
   const separation = settings.topDiameter * 0.72;
   const model = modelXml([
     {
-      id: 1,
+      id: 2,
       name: "LittleLeafy planter body",
+      materialIndex: 0,
       mesh: geometryTo3mfMesh(potGeometry, -separation / 2),
     },
     {
-      id: 2,
-      name: "LittleLeafy snap base",
+      id: 3,
+      name: settings.selfWatering ? "LittleLeafy water reservoir sleeve" : "LittleLeafy snap base",
+      materialIndex: 1,
       mesh: geometryTo3mfMesh(baseGeometry, separation / 2),
     },
   ]);
@@ -716,12 +727,14 @@ Selected settings
 - Profile: ${settings.profile}
 - Two-piece snap base: ${settings.twoPiece ? "on — exports planter body plus cork-textured snap sleeve" : "off"}
 - Base texture: ${settings.twoPiece ? settings.baseTexture ?? "cork" : "not used"}
+- Self-watering setup: ${settings.selfWatering ? "on — use the lower snap base as the reservoir sleeve and keep wick openings clear" : "off"}
 
 Printing tips
 - Print upside down for best results.
 - Use PETG or ASA for outdoor planters.
 - Add a small brim if your printer needs extra bed adhesion.
 - For two-piece pots, print the body and base separately, then press the base over the lower snap bead.
+- For self-watering pots, test fit the reservoir sleeve and add cotton wick or printed wick insert through the bottom openings.
 - Check slicer preview before printing.
 `;
 }
