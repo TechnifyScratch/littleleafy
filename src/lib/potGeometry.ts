@@ -811,5 +811,9 @@ Printing tips
 - For self-watering pots, test fit the reservoir tray, add cotton or nylon wick through the center openings, and fill only below the planter floor.
 - Empty ordinary catch trays after watering so roots do not sit in stagnant water.
 - Check slicer preview before printing.
+
+MakerWorld note
+- LittleLeafy exports a model 3MF, not a Bambu Studio print-profile 3MF.
+- To upload a MakerWorld print profile, import the STL or model 3MF into Bambu Studio, choose a Bambu Lab printer, set filament/process settings, slice, and save/export the Bambu Studio project 3MF from there.
 `;
 }

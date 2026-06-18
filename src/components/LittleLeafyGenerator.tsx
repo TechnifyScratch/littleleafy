@@ -520,6 +520,18 @@ function getDrainageRecommendation(settings: PotSettings) {
   return "Round bottom holes are the most general-purpose choice for everyday potting soil.";
 }
 
+function getExportFormatNote(format: ExportFormat | null) {
+  if (format === "3mf") {
+    return "This downloads a model 3MF for slicers. MakerWorld print profiles must be re-saved from Bambu Studio after choosing a Bambu Lab printer and print settings.";
+  }
+
+  if (format === "zip") {
+    return "ZIP includes STL files plus a README with the selected settings.";
+  }
+
+  return "STL is the safest upload format for custom model geometry.";
+}
+
 function RangeControl({
   label,
   value,
@@ -1397,7 +1409,7 @@ export function LittleLeafyGenerator() {
                 onClick={() => requestExport("3mf")}
               >
                 <Sparkles className="h-5 w-5" />
-                {exporting === "3mf" ? "Sprouting your file..." : "Download 3MF"}
+                {exporting === "3mf" ? "Sprouting your file..." : "Download Model 3MF"}
               </button>
               <button
                 className="press-button inline-flex items-center justify-center gap-2 rounded-full border border-leaf-200 bg-white px-5 py-4 text-sm font-black text-leaf-700 shadow-press hover:brightness-105"
@@ -1504,6 +1516,15 @@ export function LittleLeafyGenerator() {
               </ul>
             </div>
 
+            <div className="mt-3 rounded-2xl bg-stone-50 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
+                Export note
+              </p>
+              <p className="mt-2 text-sm font-semibold text-stone-600">
+                {getExportFormatNote(pendingExport)}
+              </p>
+            </div>
+
             <div className="mt-3 rounded-2xl bg-leaf-50/80 p-3">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-leaf-700">
                 Water path
@@ -1530,7 +1551,7 @@ export function LittleLeafyGenerator() {
               >
                 {exporting
                   ? "Sprouting your file..."
-                  : `Download ${pendingExport.toUpperCase()}`}
+                  : `Download ${pendingExport === "3mf" ? "MODEL 3MF" : pendingExport.toUpperCase()}`}
               </button>
             </div>
           </div>
@@ -1549,6 +1570,7 @@ export function LittleLeafyGenerator() {
                 <li>• Open the file in your slicer and confirm the scale is in millimeters.</li>
                 <li>• Print the planter upside down for a cleaner rim and fewer supports.</li>
                 <li>• Use PETG for outdoor or damp planters; PLA is great for indoor decor.</li>
+                <li>• MakerWorld print profiles need a Bambu Studio project 3MF; import this model into Bambu Studio, choose a Bambu printer, slice, then save that project.</li>
                 <li>• {getWaterPath(settings)}</li>
                 {settings.drainage && !settings.twoPiece ? (
                   <li>• Water will drain out the bottom, so use a saucer or outdoor surface.</li>

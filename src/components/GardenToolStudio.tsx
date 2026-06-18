@@ -606,12 +606,13 @@ export function GardenToolStudio({ initialTool }: { initialTool: GardenTool }) {
                       downloadBlob(file, `${fileSafeName(labelText)}-plant-label.3mf`);
                     }}
                   >
-                    Download 3MF
+                    Download Model 3MF
                   </button>
                 </div>
                 <p className="rounded-2xl bg-white/70 p-4 text-sm font-semibold text-stone-500">
                   The preview uses the same simplified printable layout as the exported files.
-                  STL and 3MF add shallow raised depth for printing.
+                  STL and model 3MF add shallow raised depth for printing. MakerWorld print
+                  profiles still need to be saved from Bambu Studio.
                 </p>
               </div>
               <div className="rounded-[2rem] bg-white p-6 shadow-sm">
