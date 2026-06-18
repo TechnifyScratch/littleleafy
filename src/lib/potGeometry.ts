@@ -9,6 +9,7 @@ import {
 } from "three";
 import JSZip from "jszip";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 export type PatternStyle =
   | "smooth"
@@ -42,7 +43,7 @@ export type PotSettings = {
 };
 
 const SEGMENTS = 96;
-const HEIGHT_STEPS = 34;
+const HEIGHT_STEPS = 56;
 
 function patternOffset(
   pattern: PatternStyle,
@@ -427,21 +428,23 @@ export function createPotGeometry(settings: PotSettings) {
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new BufferAttribute(new Float32Array(vertices), 3));
   geometry.setAttribute("normal", new BufferAttribute(new Float32Array(normals), 3));
-  geometry.computeBoundingSphere();
 
-  return geometry;
+  return finalizeGeometry(
+    geometry,
+    settings.pattern !== "faceted" && settings.profile !== "square",
+  );
 }
 
 function baseBasinDepth(settings: PotSettings) {
   return settings.selfWatering
-    ? Math.min(34, Math.max(22, settings.height * 0.28))
-    : Math.min(18, Math.max(11, settings.height * 0.15));
+    ? Math.min(26, Math.max(19, settings.height * 0.2))
+    : Math.min(14, Math.max(9, settings.height * 0.11));
 }
 
 function baseCollarHeight(settings: PotSettings) {
   return settings.selfWatering
-    ? Math.min(42, Math.max(30, settings.height * 0.34))
-    : Math.min(32, Math.max(22, settings.height * 0.26));
+    ? Math.min(18, Math.max(12, settings.height * 0.13))
+    : Math.min(16, Math.max(9, settings.height * 0.12));
 }
 
 function baseRingPoint(settings: PotSettings, level: number, segment: number, inner = false) {
@@ -458,11 +461,17 @@ function baseRingPoint(settings: PotSettings, level: number, segment: number, in
       : 0;
   const outerTexture = inner ? 0 : baseTextureOffset(settings.baseTexture, angle, level);
   const clearance = settings.selfWatering ? 2.4 : 1.25;
-  const wall = Math.max(3.4, settings.wallThickness * 1.35);
-  const reservoirShoulder = settings.selfWatering ? 5.2 : 2.8;
+  const wall = Math.max(3.2, settings.wallThickness * 1.2);
+  const reservoirShoulder = settings.selfWatering ? 2.6 : 2.4;
+  const trayCurve = settings.selfWatering
+    ? Math.sin(Math.PI * level) * 1.2 - (1 - level) * 1.8
+    : Math.sin(Math.PI * level) * 0.7 - (1 - level) * 0.9;
+  const softLip = inner
+    ? 0
+    : Math.exp(-Math.pow((level - 0.94) / 0.09, 2)) * (settings.selfWatering ? 1.8 : 1.1);
   const radius = inner
     ? potRadius + clearance - groove
-    : potRadius + clearance + wall + reservoirShoulder + outerTexture;
+    : potRadius + clearance + wall + reservoirShoulder + trayCurve + softLip + outerTexture;
 
   return new Vector3(
     Math.cos(angle) * radius,
@@ -522,7 +531,7 @@ function addBaseFloor(
 export function createSnapBaseGeometry(settings: PotSettings) {
   const vertices: number[] = [];
   const normals: number[] = [];
-  const steps = 16;
+  const steps = settings.selfWatering ? 28 : 22;
 
   for (let heightIndex = 0; heightIndex < steps; heightIndex += 1) {
     const levelA = heightIndex / steps;
@@ -557,9 +566,23 @@ export function createSnapBaseGeometry(settings: PotSettings) {
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new BufferAttribute(new Float32Array(vertices), 3));
   geometry.setAttribute("normal", new BufferAttribute(new Float32Array(normals), 3));
-  geometry.computeBoundingSphere();
 
-  return geometry;
+  return finalizeGeometry(geometry, settings.baseTexture !== "faceted");
+}
+
+function finalizeGeometry(geometry: BufferGeometry, smooth = true) {
+  if (!smooth) {
+    geometry.computeBoundingSphere();
+    return geometry;
+  }
+
+  geometry.deleteAttribute("normal");
+  const merged = mergeVertices(geometry, 0.001);
+  geometry.dispose();
+  merged.computeVertexNormals();
+  merged.computeBoundingSphere();
+
+  return merged;
 }
 
 function stlFromGeometry(geometry: BufferGeometry) {

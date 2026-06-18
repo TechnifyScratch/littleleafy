@@ -236,17 +236,17 @@ const templates: PotTemplate[] = [
     description: "A two-piece planter with bottom wick openings and a sealed water reservoir tray.",
     vibe: "Wick-fed reservoir",
     category: "Special",
-    color: "#44b79a",
+    color: "#e8e1d2",
     special: true,
     settings: {
-      height: 112,
-      topDiameter: 104,
-      bottomDiameter: 82,
+      height: 96,
+      topDiameter: 102,
+      bottomDiameter: 86,
       wallThickness: 3,
       drainage: true,
       drainageHoles: 5,
       drainageStyle: "center-plus",
-      rimThickness: 7,
+      rimThickness: 6,
       pattern: "smooth",
       profile: "cylinder",
       twoPiece: true,
@@ -611,7 +611,7 @@ function PotModel({
       {baseGeometry ? (
         <mesh geometry={baseGeometry} castShadow receiveShadow>
           <meshStandardMaterial
-            color="#b8793f"
+            color={settings.selfWatering ? "#b6956b" : "#b8793f"}
             roughness={0.92}
             metalness={0}
             side={DoubleSide}
