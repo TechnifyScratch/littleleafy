@@ -59,7 +59,7 @@ const defaultSettings: PotSettings = {
   rimThickness: 6,
   pattern: "smooth",
   profile: "soft-bowl",
-  twoPiece: false,
+  twoPiece: true,
   baseTexture: "cork",
 };
 
@@ -160,8 +160,8 @@ const templates: PotTemplate[] = [
       rimThickness: 9,
       pattern: "smooth",
       profile: "classic",
-      twoPiece: false,
-      baseTexture: "cork",
+      twoPiece: true,
+      baseTexture: "smooth",
     },
   },
   {
@@ -204,8 +204,8 @@ const templates: PotTemplate[] = [
       rimThickness: 6,
       pattern: "arches",
       profile: "cylinder",
-      twoPiece: false,
-      baseTexture: "smooth",
+      twoPiece: true,
+      baseTexture: "soft-rings",
     },
   },
   {
@@ -226,15 +226,15 @@ const templates: PotTemplate[] = [
       rimThickness: 6,
       pattern: "geo",
       profile: "square",
-      twoPiece: false,
+      twoPiece: true,
       baseTexture: "faceted",
     },
   },
   {
     id: "self-watering",
     name: "Self-Watering Smart Pot",
-    description: "A sleek two-piece planter with wick openings and a snap-on reservoir sleeve.",
-    vibe: "Smart reservoir system",
+    description: "A two-piece planter with bottom wick openings and a sealed water reservoir tray.",
+    vibe: "Wick-fed reservoir",
     category: "Special",
     color: "#44b79a",
     special: true,
@@ -250,7 +250,7 @@ const templates: PotTemplate[] = [
       pattern: "smooth",
       profile: "cylinder",
       twoPiece: true,
-      baseTexture: "soft-rings",
+      baseTexture: "smooth",
       selfWatering: true,
     },
   },
@@ -440,7 +440,15 @@ function getPrintWarnings(settings: PotSettings) {
   }
 
   if (!settings.drainage) {
-    warnings.push("No drainage holes selected. Best for cachepots or plants in nursery inserts.");
+    warnings.push("No drainage holes selected. Best for cachepots or plants kept in nursery inserts.");
+  }
+
+  if (settings.drainage && !settings.twoPiece) {
+    warnings.push("Drainage exits through the bottom; use this outdoors or place it on a saucer.");
+  }
+
+  if (settings.drainage && settings.twoPiece && !settings.selfWatering) {
+    warnings.push("The catch tray collects runoff; empty it after watering so roots do not sit in water.");
   }
 
   if (settings.pattern === "arches" || settings.pattern === "geo") {
@@ -448,11 +456,11 @@ function getPrintWarnings(settings: PotSettings) {
   }
 
   if (settings.twoPiece) {
-    warnings.push("Print both snap-fit pieces before forcing the fit; scale the base by 101% if your printer runs tight.");
+    warnings.push("Print both click-fit pieces before forcing the fit; scale the tray by 101% if your printer runs tight.");
   }
 
   if (settings.selfWatering) {
-    warnings.push("Keep the center wick openings clear in your slicer so water can reach the soil.");
+    warnings.push("Thread cotton or nylon wick through the center openings and fill the reservoir only below the planter floor.");
   }
 
   return warnings;
@@ -466,11 +474,11 @@ function getMaterialSuggestions(settings: PotSettings) {
   }
 
   if (settings.twoPiece) {
-    suggestions.push("Try matte PLA for the body and woodfill or tan PETG for the snap base.");
+    suggestions.push("Try matte PLA for the body and PETG for the catch tray if it will hold water.");
   }
 
   if (settings.selfWatering) {
-    suggestions.push("PETG is recommended for the reservoir sleeve because it handles moisture better.");
+    suggestions.push("PETG is recommended for the reservoir tray because it handles moisture better.");
   }
 
   if (settings.pattern === "fluted" || settings.pattern === "spiral" || settings.pattern === "wave-ridges") {
@@ -478,6 +486,38 @@ function getMaterialSuggestions(settings: PotSettings) {
   }
 
   return suggestions.slice(0, 3);
+}
+
+function getWaterPath(settings: PotSettings) {
+  if (!settings.drainage) {
+    return "Water stays inside this shell, so use it as a cachepot with a nursery insert or water very lightly.";
+  }
+
+  if (settings.selfWatering) {
+    return "Water sits in the lower reservoir tray and reaches soil through cotton or nylon wick threaded through the center openings.";
+  }
+
+  if (settings.twoPiece) {
+    return "Water drains through the planter body into the click-fit catch tray, which should be emptied after watering.";
+  }
+
+  return "Water exits through the bottom holes, so this setup needs a saucer, sink, outdoor surface, or separate cachepot.";
+}
+
+function getDrainageRecommendation(settings: PotSettings) {
+  if (settings.selfWatering) {
+    return "Best for herbs and small foliage plants that like consistent moisture; avoid cactus or plants that need to fully dry out.";
+  }
+
+  if (settings.drainageStyle === "slots") {
+    return "Slots are best for chunky outdoor soil where fast runoff matters.";
+  }
+
+  if (settings.drainageStyle === "mesh") {
+    return "Mesh drainage suits finer potting mixes, but still needs a tray or saucer indoors.";
+  }
+
+  return "Round bottom holes are the most general-purpose choice for everyday potting soil.";
 }
 
 function RangeControl({
@@ -716,7 +756,12 @@ export function LittleLeafyGenerator() {
 
     if (parts.base) {
       zip.file("little-leafy-planter-body.stl", parts.body);
-      zip.file("little-leafy-snap-base.stl", parts.base);
+      zip.file(
+        settings.selfWatering
+          ? "little-leafy-reservoir-tray.stl"
+          : "little-leafy-catch-tray.stl",
+        parts.base,
+      );
     } else {
       zip.file("little-leafy-planter.stl", parts.body);
     }
@@ -914,8 +959,8 @@ export function LittleLeafyGenerator() {
                         className={`press-button grid grid-cols-[3rem_1fr] gap-3 rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 ${
                           template.special
                             ? activeTemplate === template.id
-                              ? "border-lilac-300 bg-gradient-to-br from-leaf-500 via-emerald-500 to-lilac-500 text-white shadow-soft"
-                              : "border-transparent bg-gradient-to-br from-leaf-500 via-emerald-500 to-lilac-500 text-white shadow-soft"
+                              ? "border-emerald-200 bg-gradient-to-br from-stone-950 via-emerald-800 to-lilac-800 text-white shadow-soft"
+                              : "border-transparent bg-gradient-to-br from-stone-900 via-emerald-800 to-lilac-800 text-white shadow-soft"
                             : activeTemplate === template.id
                               ? "border-leaf-300 bg-white text-leaf-700"
                               : "border-white/80 bg-white/75 text-stone-700"
@@ -930,7 +975,7 @@ export function LittleLeafyGenerator() {
                           style={template.special ? undefined : { backgroundColor: template.color }}
                         >
                           {template.special ? (
-                            <span className="absolute inset-2 rounded-full bg-gradient-to-br from-leaf-400 to-lilac-400" />
+                            <span className="absolute inset-x-2 top-2 h-8 rounded-t-2xl rounded-b-md bg-gradient-to-b from-white to-stone-100" />
                           ) : null}
                           {template.settings.twoPiece ? (
                             <span
@@ -944,7 +989,7 @@ export function LittleLeafyGenerator() {
                           <span
                             className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] shadow-sm ${
                               template.special
-                                ? "bg-white/20 text-white"
+                                ? "bg-white/15 text-emerald-50"
                                 : "bg-white text-stone-400"
                             }`}
                           >
@@ -961,7 +1006,7 @@ export function LittleLeafyGenerator() {
                           <span
                             className={`mt-2 inline-flex rounded-full px-2 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${
                               template.special
-                                ? "bg-white text-lilac-700"
+                                ? "bg-white text-emerald-800"
                                 : "bg-lilac-50 text-lilac-700"
                             }`}
                           >
@@ -1220,7 +1265,7 @@ export function LittleLeafyGenerator() {
                   <div>
                     <p className="text-base font-black text-stone-900">Choose base construction</p>
                     <p className="text-sm font-semibold text-stone-500">
-                      Make a one-piece planter or add a click-fit sleeve for a modern two-tone look.
+                      Make a one-piece planter or add a click-fit catch tray for drainage or self-watering.
                     </p>
                   </div>
                   <div className="rounded-lg border border-leaf-100 bg-white/80 p-3 shadow-sm">
@@ -1229,8 +1274,8 @@ export function LittleLeafyGenerator() {
                         <p className="text-sm font-semibold text-stone-700">Two-piece snap pot</p>
                         <p className="text-xs font-medium text-stone-500">
                           {settings.selfWatering
-                            ? "Adds a snap-on reservoir sleeve with wick access through the bottom openings."
-                            : "Adds a cork-textured base sleeve that clicks over a lower bead."}
+                            ? "Adds a sealed reservoir tray with wick access through the bottom openings."
+                            : "Adds a catch tray that clicks over a lower bead instead of draining onto the desk."}
                         </p>
                       </div>
                       <button
@@ -1248,8 +1293,8 @@ export function LittleLeafyGenerator() {
                       <div className="mt-3 grid gap-3">
                         <p className="rounded-2xl bg-lilac-50 px-3 py-2 text-xs font-bold text-lilac-700">
                           {settings.selfWatering
-                            ? "ZIP export includes a planter body plus a separate reservoir sleeve STL."
-                            : "ZIP export includes separate body and snap-base STL files."}
+                            ? "ZIP export includes a planter body plus a separate water reservoir tray STL."
+                            : "ZIP export includes separate body and catch-tray STL files."}
                         </p>
                         <div className="grid gap-2">
                           {baseTextureLabels.map((texture) => (
@@ -1459,6 +1504,16 @@ export function LittleLeafyGenerator() {
               </ul>
             </div>
 
+            <div className="mt-3 rounded-2xl bg-leaf-50/80 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-leaf-700">
+                Water path
+              </p>
+              <p className="mt-2 text-sm font-semibold text-stone-600">{getWaterPath(settings)}</p>
+              <p className="mt-1 text-xs font-bold text-stone-500">
+                {getDrainageRecommendation(settings)}
+              </p>
+            </div>
+
             <div className="mt-5 grid gap-3 sm:grid-cols-[0.8fr_1.2fr]">
               <button
                 className="press-button rounded-full border border-stone-200 bg-white px-5 py-3 text-sm font-black text-stone-600 shadow-press"
@@ -1494,9 +1549,16 @@ export function LittleLeafyGenerator() {
                 <li>• Open the file in your slicer and confirm the scale is in millimeters.</li>
                 <li>• Print the planter upside down for a cleaner rim and fewer supports.</li>
                 <li>• Use PETG for outdoor or damp planters; PLA is great for indoor decor.</li>
+                <li>• {getWaterPath(settings)}</li>
+                {settings.drainage && !settings.twoPiece ? (
+                  <li>• Water will drain out the bottom, so use a saucer or outdoor surface.</li>
+                ) : null}
+                {settings.drainage && settings.twoPiece && !settings.selfWatering ? (
+                  <li>• The catch tray collects runoff; empty it after watering.</li>
+                ) : null}
                 <li>• For two-piece pots, print both parts separately before test fitting.</li>
                 {settings.selfWatering ? (
-                  <li>• Add cotton wick through the center openings and fill the sleeve only below the pot floor.</li>
+                  <li>• Add cotton or nylon wick through the center openings and fill the reservoir only below the pot floor.</li>
                 ) : null}
               </ul>
             </div>

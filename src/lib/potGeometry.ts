@@ -432,21 +432,41 @@ export function createPotGeometry(settings: PotSettings) {
   return geometry;
 }
 
+function baseBasinDepth(settings: PotSettings) {
+  return settings.selfWatering
+    ? Math.min(34, Math.max(22, settings.height * 0.28))
+    : Math.min(18, Math.max(11, settings.height * 0.15));
+}
+
+function baseCollarHeight(settings: PotSettings) {
+  return settings.selfWatering
+    ? Math.min(42, Math.max(30, settings.height * 0.34))
+    : Math.min(32, Math.max(22, settings.height * 0.26));
+}
+
 function baseRingPoint(settings: PotSettings, level: number, segment: number, inner = false) {
   const angle = (segment / SEGMENTS) * Math.PI * 2;
-  const baseHeight = Math.min(34, Math.max(22, settings.height * 0.26));
-  const potLevel = (level * baseHeight) / settings.height;
+  const basinDepth = baseBasinDepth(settings);
+  const collarHeight = baseCollarHeight(settings);
+  const y = level * (collarHeight + basinDepth) - basinDepth;
+  const potLevel = Math.max(0, Math.min(0.44, y / settings.height));
   const potRadius = radiusAt(settings, potLevel);
   const groove =
-    Math.exp(-Math.pow((potLevel - snapLevel(settings)) / 0.024, 2)) * (inner ? 1.15 : 0);
+    y >= 0
+      ? Math.exp(-Math.pow((potLevel - snapLevel(settings)) / 0.024, 2)) *
+        (inner ? 1.15 : 0)
+      : 0;
   const outerTexture = inner ? 0 : baseTextureOffset(settings.baseTexture, angle, level);
+  const clearance = settings.selfWatering ? 2.4 : 1.25;
+  const wall = Math.max(3.4, settings.wallThickness * 1.35);
+  const reservoirShoulder = settings.selfWatering ? 5.2 : 2.8;
   const radius = inner
-    ? potRadius + 0.3 - groove
-    : potRadius + Math.max(3.8, settings.wallThickness * 1.3) + outerTexture;
+    ? potRadius + clearance - groove
+    : potRadius + clearance + wall + reservoirShoulder + outerTexture;
 
   return new Vector3(
     Math.cos(angle) * radius,
-    level * baseHeight,
+    y,
     Math.sin(angle) * radius,
   );
 }
@@ -466,6 +486,36 @@ function addBaseAnnulus(
     const innerB = baseRingPoint(settings, level, nextSegment, true);
 
     addQuad(vertices, normals, innerA, innerB, outerB, outerA, flip);
+  }
+}
+
+function addBaseFloor(
+  vertices: number[],
+  normals: number[],
+  settings: PotSettings,
+) {
+  const radialSteps = 22;
+
+  for (let radialIndex = 0; radialIndex < radialSteps; radialIndex += 1) {
+    const innerScale = radialIndex / radialSteps;
+    const outerScale = (radialIndex + 1) / radialSteps;
+
+    for (let segment = 0; segment < SEGMENTS; segment += 1) {
+      const nextSegment = segment + 1;
+      const outerA = baseRingPoint(settings, 0, segment);
+      const outerB = baseRingPoint(settings, 0, nextSegment);
+      const a = outerA.clone().multiplyScalar(innerScale);
+      const b = outerB.clone().multiplyScalar(innerScale);
+      const c = outerB.clone().multiplyScalar(outerScale);
+      const d = outerA.clone().multiplyScalar(outerScale);
+
+      a.y = outerA.y;
+      b.y = outerB.y;
+      c.y = outerB.y;
+      d.y = outerA.y;
+
+      addQuad(vertices, normals, a, b, c, d, true);
+    }
   }
 }
 
@@ -501,7 +551,7 @@ export function createSnapBaseGeometry(settings: PotSettings) {
     }
   }
 
-  addBaseAnnulus(vertices, normals, settings, 0, true);
+  addBaseFloor(vertices, normals, settings);
   addBaseAnnulus(vertices, normals, settings, 1);
 
   const geometry = new BufferGeometry();
@@ -699,7 +749,7 @@ export async function exportPotTo3mf(settings: PotSettings) {
     },
     {
       id: 3,
-      name: settings.selfWatering ? "LittleLeafy water reservoir sleeve" : "LittleLeafy snap base",
+      name: settings.selfWatering ? "LittleLeafy water reservoir tray" : "LittleLeafy catch tray base",
       materialIndex: 1,
       mesh: geometryTo3mfMesh(baseGeometry, separation / 2),
     },
@@ -725,16 +775,18 @@ Selected settings
 - Rim thickness: ${settings.rimThickness} mm
 - Pattern style: ${settings.pattern}
 - Profile: ${settings.profile}
-- Two-piece snap base: ${settings.twoPiece ? "on — exports planter body plus cork-textured snap sleeve" : "off"}
+- Two-piece catch tray: ${settings.twoPiece ? "on — exports planter body plus a separate click-fit catch tray" : "off"}
 - Base texture: ${settings.twoPiece ? settings.baseTexture ?? "cork" : "not used"}
-- Self-watering setup: ${settings.selfWatering ? "on — use the lower snap base as the reservoir sleeve and keep wick openings clear" : "off"}
+- Self-watering setup: ${settings.selfWatering ? "on — use the lower tray as a water reservoir, keep wick openings clear, and add a wick through the center holes" : "off"}
 
 Printing tips
 - Print upside down for best results.
 - Use PETG or ASA for outdoor planters.
 - Add a small brim if your printer needs extra bed adhesion.
-- For two-piece pots, print the body and base separately, then press the base over the lower snap bead.
-- For self-watering pots, test fit the reservoir sleeve and add cotton wick or printed wick insert through the bottom openings.
+- For two-piece pots, print the body and catch tray separately, then press the tray over the lower snap bead.
+- If drainage is enabled without a tray, place the pot on a saucer or use it outdoors.
+- For self-watering pots, test fit the reservoir tray, add cotton or nylon wick through the center openings, and fill only below the planter floor.
+- Empty ordinary catch trays after watering so roots do not sit in stagnant water.
 - Check slicer preview before printing.
 `;
 }
